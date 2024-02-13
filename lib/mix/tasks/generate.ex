@@ -15,6 +15,30 @@ defmodule Mix.Tasks.Merquery.Generate do
 
   use Mix.Task
 
+  defp encode_value(%{__struct__: _} = value) do
+    value
+    |> Map.from_struct()
+    |> encode_value
+  end
+
+  defp encode_value(value) when is_map(value) do
+    Enum.into(value, %{}, fn {k, v} ->
+      {encode_value(k), encode_value(v)}
+    end)
+  end
+
+  defp encode_value(value) when is_list(value) do
+    Enum.map(value, &encode_value/1)
+  end
+
+  defp encode_value({v1, v2}) do
+    %{encode_value(v1) => encode_value(v2)}
+  end
+
+  defp encode_value(value) when value in [true, false, nil], do: value
+
+  defp encode_value(value), do: to_string(value)
+
   @impl Mix.Task
   def run(args) do
     Mix.Task.run("compile", args)
@@ -36,7 +60,8 @@ defmodule Mix.Tasks.Merquery.Generate do
             passed_router -> router(passed_router, base)
           end
 
-        allowed_verbs = [:get, :post, :put, :patch, :delete]
+        allowed_verbs = [:get, :post, :put, :patch, :delete, :head]
+        match_all = :*
 
         deps =
           quote do
@@ -59,17 +84,80 @@ defmodule Mix.Tasks.Merquery.Generate do
         """
 
         routes =
-          for {%{path: path, verb: verb}, index} <-
+          for {%{path: path, verb: verb, metadata: metadata}, index} <-
                 Enum.with_index(Phoenix.Router.routes(router_mod)),
-              verb in allowed_verbs do
+              verb == match_all or verb in allowed_verbs do
+            parameters = get_in(metadata, [:merquery, :parameters])
+
+            path =
+              unless is_nil(parameters) do
+                parameters = parameters |> Enum.into(%{})
+
+                path
+                |> String.split("/")
+                |> Enum.into(<<>>, fn part ->
+                  case part do
+                    "" ->
+                      part
+
+                    <<":"::utf8, rest::binary>> ->
+                      current =
+                        try do
+                          String.to_existing_atom(rest)
+                        rescue
+                          ArgumentError ->
+                            nil
+                        end
+
+                      if Map.has_key?(parameters, current) do
+                        "/#{Map.fetch!(parameters, current)}"
+                      else
+                        "/" <> part
+                      end
+
+                    _ ->
+                      "/" <> part
+                  end
+                end)
+              else
+                path
+              end
+
             attrs =
-              %{
-                "request_type" => Atom.to_string(verb),
-                "url" => "#{opts[:base_url]}#{path}",
-                "client" => "req",
-                "variable" => "resp#{index}",
-                "req" => %{}
-              }
+              Map.merge(
+                %{
+                  "request_type" =>
+                    case verb do
+                      :* ->
+                        "get"
+
+                      _ ->
+                        Atom.to_string(verb)
+                    end,
+                  "url" => "#{opts[:base_url]}#{path}",
+                  "client" => "req",
+                  "variable" => "resp#{index}",
+                  "req" => %{},
+                  "verbs" =>
+                    case verb do
+                      :* ->
+                        allowed_verbs
+
+                      _ ->
+                        [Atom.to_string(verb)]
+                    end
+                },
+                metadata
+                |> Map.get(:merquery, %{})
+                |> then(&if(Keyword.keyword?(&1), do: Enum.into(&1, %{}), else: &1))
+                |> Map.update(:params, [], fn params ->
+                  Enum.map(params, &Merquery.Helpers.Field.new/1)
+                end)
+                |> Map.update(:headers, [], fn headers ->
+                  Enum.map(headers, &Merquery.Helpers.Field.new/1)
+                end)
+                |> encode_value()
+              )
 
             cell_info = %{
               "attrs" => attrs |> Jason.encode!() |> Base.encode64(padding: false),
