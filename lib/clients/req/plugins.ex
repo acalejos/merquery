@@ -1,6 +1,30 @@
 defmodule Merquery.Clients.Req.Plugins do
   @moduledoc false
 
+  defp available_plugins do
+    for {app, _, _} <- :application.loaded_applications(),
+        {:ok, modules} = :application.get_key(app, :modules),
+        mod <- modules,
+        function_exported?(Code.ensure_loaded!(mod), :attach, 1),
+        reduce: [] do
+      acc ->
+        case Code.fetch_docs(mod) do
+          {:docs_v1, _, :elixir, _, %{"en" => module_doc}, _, _} ->
+            doc = module_doc |> String.split("\n") |> Enum.at(0)
+            [%{"name" => Atom.to_string(mod), "docs" => doc} | acc]
+
+          {:docs_v1, _, :elixir, _, :none, _, _} ->
+            [%{"name" => Atom.to_string(mod), "docs" => ""} | acc]
+
+          {_, _, :erlang, _, _, _, _} ->
+            acc
+
+          {:error, :module_not_found} ->
+            acc
+        end
+    end
+  end
+
   def plugins do
     [
       %{

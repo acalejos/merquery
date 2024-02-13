@@ -83,7 +83,7 @@ defmodule Merquery.Clients.Req.Adapter do
       )
 
     pretty_params =
-      Map.get(attrs, "attrs", [])
+      Map.get(attrs, "params", [])
       |> Enum.filter(&Map.get(&1, "active"))
       |> Enum.map(fn
         %{"key" => key, "value" => value, "isSecretValue" => true} ->

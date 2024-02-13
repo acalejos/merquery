@@ -4,6 +4,7 @@ defmodule Merquery.SmartCell do
   use Kino.SmartCell, name: "Merquery"
 
   @common_fields ["variable", "client", "request_type", "params", "headers", "url"]
+  @all_verbs ["get", "post", "put", "patch", "delete", "head"]
 
   @impl true
   def init(attrs, ctx) do
@@ -15,7 +16,8 @@ defmodule Merquery.SmartCell do
       "request_type" => attrs["request_type"] || "get",
       "params" => attrs["params"] || [],
       "headers" => attrs["headers"] || [],
-      "url" => attrs["url"] || ""
+      "url" => attrs["url"] || "",
+      "verbs" => attrs["verbs"] || @all_verbs
     }
 
     fields =
