@@ -572,3 +572,43 @@
   color: var(--gray-600);
 }
 
+.button-group {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Adjust the space between buttons */
+  margin-left: 10px;
+}
+
+.button-group button {
+  width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px; /* Space between icon and text */
+  padding: 8px 16px;
+  font-size: 0.875rem; /* 14px */
+  font-weight: 500;
+  color: var(--gray-800);
+  background-color: var(--blue-100);
+  border: none;
+  border-radius: 0.375rem; /* 6px */
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.button-group button:hover {
+  background-color: var(--gray-300); /* Lighter shade for hover effect */
+}
+
+.button-group button svg {
+  width: 20px; /* Adjust based on your icon size preference */
+  height: 20px;
+  fill: currentColor; /* SVG color inherits from button text color */
+}
+
+/* Additional styling to visually disable the button, if needed */
+.button-group button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

@@ -245,6 +245,21 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
+  def handle_event("refreshPlugins", _, %{assigns: %{fields: fields}} = ctx) do
+    available_plugins = Merquery.Plugins.available_plugins()
+
+    updated_fields =
+      Map.update(fields, "plugins", [], fn plugins ->
+        (plugins ++ available_plugins) |> Enum.uniq_by(&Map.get(&1, "name"))
+      end)
+
+    ctx =
+      update(ctx, :fields, fn _ -> updated_fields end)
+
+    broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    {:noreply, ctx}
+  end
+
   defp missing_dep(%{"plugins" => plugins}) do
     for %{"name" => name, "active" => true, "version" => version} <- plugins do
       unless Code.ensure_loaded?(Merquery.Plugins.plugin_to_module(%{"name" => name})) do
