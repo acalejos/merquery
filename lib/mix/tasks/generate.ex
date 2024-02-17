@@ -10,10 +10,12 @@ defmodule Mix.Tasks.Merquery.Generate do
   * `:router` - The module of your router. Defaults to the default Phoenix Router.
   * `:out` - Path to save the generated file. Defaults to `merquery.livemd`
   * `:base_url` - Base URL to append to all generated routes. Defaults to `https://0.0.0.0`
+  * `:preview_body` - Automatically attempts to render the HTML contents of the body by passing
+     the body into `Kino.HTML.new/1`
   """
   @shortdoc "Generates a Livebook to test your defined routes"
-
   use Mix.Task
+  import Merquery.Helpers.Constants
 
   defp encode_value(%{__struct__: _} = value) do
     value
@@ -60,15 +62,13 @@ defmodule Mix.Tasks.Merquery.Generate do
             passed_router -> router(passed_router, base)
           end
 
-        allowed_verbs = [:get, :post, :put, :patch, :delete, :head]
         match_all = :*
 
         deps =
           quote do
             Mix.install([
               {:kino, "~> 0.12"},
-              {:merquery, gitub: "acalejos/merquery"},
-              {:req, "~> 0.4"}
+              {:merquery, gitub: "acalejos/merquery"}
             ])
           end
           |> Macro.to_string()
@@ -86,78 +86,65 @@ defmodule Mix.Tasks.Merquery.Generate do
         routes =
           for {%{path: path, verb: verb, metadata: metadata}, index} <-
                 Enum.with_index(Phoenix.Router.routes(router_mod)),
-              verb == match_all or verb in allowed_verbs do
-            parameters = get_in(metadata, [:merquery, :parameters])
+              verb == match_all or verb in all_verbs() do
+            # We infer some attrs from the route information
+            auto_attrs = %{
+              "request_type" =>
+                case verb do
+                  :* ->
+                    "get"
 
-            path =
-              unless is_nil(parameters) do
-                parameters = parameters |> Enum.into(%{})
+                  _ ->
+                    Atom.to_string(verb)
+                end,
+              "url" => "#{opts[:base_url]}#{path}",
+              "variable" => "resp#{index}",
+              "verbs" =>
+                case verb do
+                  :* ->
+                    all_verbs()
 
-                path
-                |> String.split("/")
-                |> Enum.into(<<>>, fn part ->
-                  case part do
-                    "" ->
-                      part
+                  _ ->
+                    [Atom.to_string(verb)]
+                end
+            }
 
-                    <<":"::utf8, rest::binary>> ->
-                      current =
-                        try do
-                          String.to_existing_atom(rest)
-                        rescue
-                          ArgumentError ->
-                            nil
-                        end
+            # We collect the attrs provided as an option in the route
+            provided_attrs =
+              metadata
+              |> Map.get(:merquery, %{})
+              |> then(&if(Keyword.keyword?(&1), do: Enum.into(&1, %{}), else: &1))
 
-                      if Map.has_key?(parameters, current) do
-                        "/#{Map.fetch!(parameters, current)}"
-                      else
-                        "/" <> part
-                      end
+            provided_attrs =
+              Enum.reduce(provided_attrs, %{"options" => %{}}, fn
+                {key, headers}, acc when key in [:headers, :params] ->
+                  # Headers handled separately since they map to a list
+                  # but are top-level args.
+                  # We include params here as well since they're tracked outside of the
+                  # "options" map in the client
+                  Map.put(acc, key, Enum.map(headers || [], &Merquery.Helpers.Field.new/1))
 
-                    _ ->
-                      "/" <> part
+                {k, v}, acc when is_req_arg(k) ->
+                  Map.put(acc, k, v)
+
+                {k, v}, acc when is_req_opt(k) ->
+                  if Keyword.keyword?(v) or is_map(v) do
+                    put_in(acc, ["options", k], Enum.map(v || [], &Merquery.Helpers.Field.new/1))
+                  else
+                    put_in(acc, ["options", k], v)
                   end
-                end)
-              else
-                path
-              end
 
-            attrs =
-              Map.merge(
-                %{
-                  "request_type" =>
-                    case verb do
-                      :* ->
-                        "get"
+                {k, v}, acc when is_merquery_opt(k) ->
+                  Map.put(acc, k, v)
 
-                      _ ->
-                        Atom.to_string(verb)
-                    end,
-                  "url" => "#{opts[:base_url]}#{path}",
-                  "client" => "req",
-                  "variable" => "resp#{index}",
-                  "req" => %{},
-                  "verbs" =>
-                    case verb do
-                      :* ->
-                        allowed_verbs
+                _, acc ->
+                  acc
+              end)
+              |> encode_value()
 
-                      _ ->
-                        [Atom.to_string(verb)]
-                    end
-                },
-                metadata
-                |> Map.get(:merquery, %{})
-                |> then(&if(Keyword.keyword?(&1), do: Enum.into(&1, %{}), else: &1))
-                |> Map.update(:params, [], fn params ->
-                  Enum.map(params, &Merquery.Helpers.Field.new/1)
-                end)
-                |> Map.update(:headers, [], fn headers ->
-                  Enum.map(headers, &Merquery.Helpers.Field.new/1)
-                end)
-                |> encode_value()
-              )
+            # Deeply merge the inferred attrs and the explicitly provided attrs
+            # preferring the explicit ones
+            attrs = Map.merge(auto_attrs, provided_attrs)
 
             cell_info = %{
               "attrs" => attrs |> Jason.encode!() |> Base.encode64(padding: false),
@@ -168,21 +155,7 @@ defmodule Mix.Tasks.Merquery.Generate do
 
             block_header = "<!-- livebook: #{Jason.encode!(cell_info)} -->"
 
-            src_string =
-              case attrs["client"] do
-                "req" ->
-                  Merquery.SmartCell.to_source(%{
-                    attrs
-                    | "req" => Merquery.Clients.Req.Adapter.init(attrs)
-                  })
-
-                _ ->
-                  # TODO Change to a better default
-                  Merquery.SmartCell.to_source(%{
-                    attrs
-                    | "req" => Merquery.Clients.Req.Adapter.init(attrs)
-                  })
-              end
+            src_string = Merquery.SmartCell.__init__(attrs) |> Merquery.SmartCell.to_source()
 
             block_contents = """
             ```elixir

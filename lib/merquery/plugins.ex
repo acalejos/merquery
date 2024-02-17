@@ -1,4 +1,4 @@
-defmodule Merquery.Clients.Req.Plugins do
+defmodule Merquery.Plugins do
   @moduledoc false
 
   defp available_plugins do
