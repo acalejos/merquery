@@ -2,28 +2,59 @@ defmodule Merquery.SmartCell do
   use Kino.JS, assets_path: "lib/assets"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Merquery"
+  alias Merquery.Helpers.Constants
 
-  @common_fields ["variable", "client", "request_type", "params", "headers", "url"]
-  @all_verbs ["get", "post", "put", "patch", "delete", "head"]
+  defp get_default_steps() do
+    {:docs_v1, _annotation, _beam_language, _format, _module_doc, _metadata, docs} =
+      Code.fetch_docs(Req.Steps)
 
-  @impl true
-  def init(attrs, ctx) do
-    client = attrs["client"] || default_client()
+    step_to_doc =
+      docs
+      |> Enum.into(%{}, fn {{_kind, name, _rity}, _anno, _signature, doc, _metadata} ->
+        {name,
+         case doc do
+           %{"en" => fn_doc} ->
+             (String.split(fn_doc, ".") |> hd()) <> "."
 
-    fields = %{
-      "variable" => Kino.SmartCell.prefixed_var_name("resp", attrs["variable"]),
-      "client" => client,
+           _ ->
+             ""
+         end}
+      end)
+
+    req = Req.new()
+
+    Enum.reduce([:request_steps, :response_steps, :error_steps], %{}, fn stage, acc ->
+      steps =
+        req
+        |> Map.get(stage)
+        |> Enum.map(fn {k, _v} ->
+          %{"name" => k, "active" => true, "doc" => Map.get(step_to_doc, k)}
+        end)
+
+      Map.put(acc, Atom.to_string(stage), steps)
+    end)
+  end
+
+  def __init__(attrs) do
+    default_steps = Map.get(attrs, "steps", get_default_steps())
+
+    %{
+      "variable" =>
+        attrs["variable"] || Kino.SmartCell.prefixed_var_name("resp", attrs["variable"]),
       "request_type" => attrs["request_type"] || "get",
       "params" => attrs["params"] || [],
       "headers" => attrs["headers"] || [],
       "url" => attrs["url"] || "",
-      "verbs" => attrs["verbs"] || @all_verbs
+      "verbs" => attrs["verbs"] || Constants.all_verbs(),
+      "steps" => default_steps,
+      "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.plugins()),
+      "options" => Map.get(attrs, "options", %{})
     }
+  end
 
-    fields =
-      if Code.ensure_loaded?(Req) do
-        Map.put(fields, "req", Merquery.Clients.Req.Adapter.init(attrs["req"] || %{}))
-      end
+  @impl true
+  def init(attrs \\ %{}, ctx) do
+    fields = __init__(attrs)
 
     ctx =
       assign(ctx,
@@ -46,25 +77,155 @@ defmodule Merquery.SmartCell do
 
   @impl true
   def to_source(attrs) do
-    case attrs["client"] do
-      "req" -> Merquery.Clients.Req.Adapter.to_source(attrs)
-      _ -> []
-    end
+    using_defaults =
+      Enum.all?(
+        attrs["steps"]["response_steps"] ++
+          attrs["steps"]["request_steps"] ++
+          attrs["steps"]["error_steps"],
+        fn step -> step["active"] end
+      )
+
+    pretty_headers =
+      Map.get(attrs, "headers", [])
+      |> Enum.filter(&Map.get(&1, "active"))
+      |> Enum.map(fn
+        %{"key" => key, "value" => value, "isSecretValue" => true} ->
+          secret = "LB_#{value}"
+
+          {key, quote(do: System.fetch_env!(unquote(secret)))}
+
+        %{"key" => key, "value" => value} ->
+          {key, value}
+      end)
+
+    pretty_headers = {:%{}, [], pretty_headers}
+
+    pretty_plugins =
+      Map.get(attrs, "plugins", [])
+      |> Enum.filter(&Map.get(&1, "active"))
+      |> Enum.map(&Merquery.Plugins.plugin_to_module/1)
+      |> Enum.filter(&Code.ensure_loaded?/1)
+
+    pretty_options = Map.get(attrs, "options", %{}) |> Map.put_new("params", [])
+
+    pretty_options =
+      pretty_options
+      |> Map.update("params", [], fn params -> params ++ Map.get(attrs, "params", []) end)
+      |> Enum.map(fn
+        {option, value} when is_list(value) ->
+          value =
+            Enum.filter(value, &Map.get(&1, "active"))
+            |> Enum.map(fn
+              %{"key" => key, "value" => value, "isSecretValue" => true} ->
+                secret = "LB_#{value}"
+                # TODO: Clean this up. Don't like String.to_atom being here. Would rather have
+                # Req.Steps.put_path_params support String keys
+                key = if option in ["path_params"], do: String.to_atom(key), else: key
+                {key, quote(do: System.fetch_env!(unquote(secret)))}
+
+              %{"key" => key, "value" => value} ->
+                key = if option in ["path_params"], do: String.to_atom(key), else: key
+                {key, value}
+            end)
+
+          {String.to_existing_atom(option), {:%{}, [], value}}
+
+        {option, value} ->
+          {option, value}
+      end)
+
+    req_args = [
+      method: String.to_atom(attrs["request_type"]),
+      url: attrs["url"],
+      headers: pretty_headers
+    ]
+
+    steps_block =
+      if using_defaults do
+        # If using defaults we can use the high-level API
+        quote do
+          req =
+            Req.new(unquote(req_args ++ pretty_options))
+        end
+      else
+        %{
+          "steps" => %{
+            "request_steps" => default_request,
+            "response_steps" => default_response,
+            "error_steps" => default_error
+          }
+        } = attrs
+
+        new_req = Req.new()
+
+        request_steps =
+          default_request
+          |> Enum.filter(&Map.get(&1, "active", true))
+          |> Enum.map(fn step -> step |> Map.get("name") |> String.to_existing_atom() end)
+
+        request_steps =
+          new_req |> Map.get(:request_steps) |> Enum.filter(fn {k, _v} -> k in request_steps end)
+
+        response_steps =
+          default_response
+          |> Enum.filter(&Map.get(&1, "active", true))
+          |> Enum.map(fn step -> step |> Map.get("name") |> String.to_existing_atom() end)
+
+        response_steps =
+          new_req
+          |> Map.get(:response_steps)
+          |> Enum.filter(fn {k, _v} -> k in response_steps end)
+
+        error_steps =
+          default_error
+          |> Enum.filter(&Map.get(&1, "active", true))
+          |> Enum.map(fn step -> step |> Map.get("name") |> String.to_existing_atom() end)
+
+        error_steps =
+          new_req |> Map.get(:error_steps) |> Enum.filter(fn {k, _v} -> k in error_steps end)
+
+        # We pass the options keys to Req.Request.register_options/1 since they should be validated
+        # beforehand -- we don't need Req to do it and it clutters the generated code
+        quote do
+          req =
+            Req.Request.new(unquote(req_args))
+            |> Req.Request.register_options(unquote(Keyword.keys(pretty_options)))
+            |> Req.update(unquote(pretty_options))
+            |> Req.Request.append_request_steps(unquote(request_steps))
+            |> Req.Request.append_response_steps(unquote(response_steps))
+            |> Req.Request.append_error_steps(unquote(error_steps))
+        end
+      end
+
+    plugin_block =
+      quote do
+        req =
+          Enum.reduce(unquote(pretty_plugins), req, fn plugin, acc -> plugin.attach(acc) end)
+      end
+
+    run_block =
+      quote do
+        {req, unquote(quoted_var(attrs["variable"]))} = Req.request(req)
+        unquote(quoted_var(attrs["variable"]))
+      end
+
+    blocks =
+      case pretty_plugins do
+        [] ->
+          [steps_block, run_block]
+
+        _ ->
+          [steps_block, plugin_block, run_block]
+      end
+
+    blocks
+    |> Enum.map(&Kino.SmartCell.quoted_to_string/1)
+    |> Enum.join("\n")
   end
 
   @impl true
   def to_attrs(%{assigns: %{fields: fields}}) do
-    client_field = Map.get(fields, "client", default_client())
-    Map.take(fields, [client_field | @common_fields])
-  end
-
-  defp default_client() do
-    cond do
-      Code.ensure_loaded?(Req) -> "req"
-      Code.ensure_loaded?(HTTPoison) -> "httpoison"
-      Code.ensure_loaded?(Tesla) -> "tesla"
-      true -> "req"
-    end
+    fields
   end
 
   @impl true
@@ -84,30 +245,71 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
-  defp missing_dep(%{"req" => %{"plugins" => plugins}}) do
+  defp missing_dep(%{"plugins" => plugins}) do
     for %{"name" => name, "active" => true, "version" => version} <- plugins do
-      unless Code.ensure_loaded?(Merquery.Clients.Req.Plugins.plugin_to_module(%{"name" => name})) do
+      unless Code.ensure_loaded?(Merquery.Plugins.plugin_to_module(%{"name" => name})) do
         version
       end
     end
     |> Enum.join("\n")
   end
 
-  defp missing_dep(%{"client" => "req"}) do
-    unless Code.ensure_loaded?(Req) do
-      ~s/{:req, "~> 0.4"}/
+  defp existing_atom?(str) when is_binary(str) do
+    try do
+      String.to_existing_atom(str) && true
+    rescue
+      ArgumentError ->
+        false
     end
   end
 
-  defp missing_dep(%{"client" => "httpoison"}) do
-    unless Code.ensure_loaded?(HTTPoison) do
-      ~s/{:httpoison, "~> 2.2"}/
-    end
-  end
+  defp quoted_var(string), do: {String.to_atom(string), [], nil}
 
-  defp missing_dep(%{"client" => "Tesla"}) do
-    unless Code.ensure_loaded?(Tesla) do
-      ~s/{:tesla, "~> 1.4"}/
-    end
-  end
+  def req_options,
+    do: [
+      # request steps
+      :user_agent,
+      :compressed,
+      :range,
+      :base_url,
+      :params,
+      :path_params,
+      :auth,
+      :form,
+      :json,
+      :compress_body,
+      :checksum,
+      :aws_sigv4,
+
+      # response steps
+      :raw,
+      :http_errors,
+      :decode_body,
+      :decode_json,
+      :redirect,
+      :redirect_trusted,
+      :redirect_log_level,
+      :max_redirects,
+      :retry,
+      :retry_delay,
+      :retry_log_level,
+      :max_retries,
+      :cache,
+      :cache_dir,
+      :plug,
+      :finch,
+      :finch_request,
+      :finch_private,
+      :connect_options,
+      :inet6,
+      :receive_timeout,
+      :pool_timeout,
+      :unix_socket,
+      :redact_auth,
+
+      # TODO: Remove on Req 1.0
+      :output,
+      :follow_redirects,
+      :location_trusted
+    ]
 end
