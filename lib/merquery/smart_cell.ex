@@ -1,5 +1,5 @@
 defmodule Merquery.SmartCell do
-  use Kino.JS, assets_path: "lib/assets"
+  use Kino.JS, assets_path: "assets/build"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Merquery"
   alias Merquery.Helpers.Constants

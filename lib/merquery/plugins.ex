@@ -54,13 +54,13 @@ defmodule Merquery.Plugins do
         "description" => "Req plugin for GitHub authentication.",
         "version" => ~s({:req_github_oauth, ~> "0.1.0"}),
         "active" => false
+      },
+      %{
+        "name" => "req_github_paginate",
+        "version" => ~s({:req_github_paginate, github: "acalejos/req_github_paginate"}),
+        "description" => "Parses GitHub's REST Response Link Headers",
+        "active" => false
       }
-      # %{
-      #   "name" => "req_github_paginate",
-      #   "version" => ~s({:req_github_paginate, github: "acalejos/req_github_paginate"}),
-      #   "description" => "Parses GitHub's REST Response Link Headers",
-      #   "active" => false
-      # }
     ]
   end
 
