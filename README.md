@@ -41,6 +41,13 @@ def deps do
 end
 ```
 
+## Development
+
+From within the `assets` directory run `npm i` and `npm run dev`
+
+This should download all dependencies and run a watchful Vite build. This will put the newly built
+assets into the appropriate folder and watch for changes.
+
 ## Roadmap
 
 Currently, this is just a fun project I am working on and this roadmap is subject to change.
@@ -49,14 +56,15 @@ You may submit feature requests in the form of a GitHub issue.
 These are just some ideas for features I currently have, but are subject to change:
 
 * [ ] Finish basic REST operations support
-* [ ] Registering custom plugins
+* [X] Registering custom plugins
 * [ ] Improve `mix merquery.generate`
   * [X] Allow customized parameters for routes, etc.
   * [ ] Add Table of Contents at Top
-* [ ] Migrate to TailwindCSS and distinctive design palette
+* [X] Migrate to TailwindCSS
+* [ ] Use a distinctive design palette
 * [ ] Req plugin discoverability - Host a location where Req plugins can be submitted for others to
-discover for use with `Merquery`
+discover for use with `Merquery` (*Currently done within this project*)
 * [ ] Livebook routes instant deploy - Have a mix task (e.g. `mix merquery.deploy`) to automatically
 deploy the generated livebook from `mix merquery.generate`
 * [ ] ~~Support other HTTP clients and their unique features (HTTPoison, Tesla, etc. )~~ *(EDIT: Forgoing the idea of pluggable clients and instead focusing entirely on Req)*
-* [ ] Move Vue to Composition API and breakout components to SPCs
+* [X] Move Vue to Composition API and breakout components to SPCs *(EDIT: Keeping options API for now, but moved to using SFCs)*
