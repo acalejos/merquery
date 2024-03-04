@@ -29,30 +29,35 @@ export default {
 
 <template>
     <div>
-        <div class="radio-buttons">
-            <div v-for="(step_type, index) in step_types" :key="index">
-                <input type="radio" name="currentStep" :id="step_type" :value="step_type" v-model="current_step" />
-                <label :for="step_type">{{ capitalize(step_type.split("_")[0]) }}</label>
+        <fieldset class="mt-4 ml-4">
+            <legend class="sr-only">Step Type</legend>
+            <div class="sm:flex sm:items-center sm:space-x-3">
+                <div v-for="(step_type, index) in step_types" :key="index" class="flex items-center">
+                    <input class="h-4 w-4 border-gray-300 text-indigo-600" type="radio" name="currentStep"
+                        :id="step_type" :value="step_type" v-model="current_step" />
+                    <label class="ml-1 block text-sm font-medium leading-6 text-gray-900" :for="step_type">{{
+                    capitalize(step_type.split("_")[0]) }}</label>
+                </div>
             </div>
-        </div>
+        </fieldset>
 
-        <table class="base-input-table">
+        <table class="w-full border-collapse mt-4">
             <thead>
                 <tr>
-                    <th></th>
-                    <th>Step</th>
-                    <th>Description</th>
+                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50"></th>
+                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Step</th>
+                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Description</th>
                 </tr>
             </thead>
             <tbody>
                 <tr v-for="(row, index) in currentSteps" :key="index">
-                    <td>
+                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
                         <BaseSwitch v-model="row.active" />
                     </td>
-                    <td>
+                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
                         {{ row.name }}
                     </td>
-                    <td>
+                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
                         {{ row.doc }}
                     </td>
                 </tr>

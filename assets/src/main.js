@@ -11,8 +11,8 @@ export async function init(ctx, info) {
   ctx.importCSS(
     "https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap"
   );
+  const available_plugins = info.available_plugins;
   const state = reactive(info);
-  console.log(state);
   function setValues(fields) {
     for (const field in fields) {
       if (state.fields.hasOwnProperty(field)) {
@@ -38,6 +38,10 @@ export async function init(ctx, info) {
       );
   });
 
-  const app = createApp(App, { modelValue: state, ctx });
+  const app = createApp(App, {
+    modelValue: state,
+    ctx,
+    availablePlugins: available_plugins,
+  });
   app.mount(ctx.root);
 }

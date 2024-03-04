@@ -47,7 +47,7 @@ defmodule Merquery.SmartCell do
       "url" => attrs["url"] || "",
       "verbs" => attrs["verbs"] || Constants.all_verbs(),
       "steps" => default_steps,
-      "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.plugins()),
+      "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.loaded_plugins()),
       "options" => Map.get(attrs, "options", %{})
     }
   end
@@ -59,7 +59,8 @@ defmodule Merquery.SmartCell do
     ctx =
       assign(ctx,
         fields: fields,
-        missing_dep: missing_dep(fields)
+        missing_dep: missing_dep(fields),
+        available_plugins: Merquery.Plugins.available_plugins()
       )
 
     {:ok, ctx}
@@ -69,7 +70,8 @@ defmodule Merquery.SmartCell do
   def handle_connect(ctx) do
     payload = %{
       fields: ctx.assigns.fields,
-      missing_dep: ctx.assigns.missing_dep
+      missing_dep: ctx.assigns.missing_dep,
+      available_plugins: ctx.assigns.available_plugins
     }
 
     {:ok, payload, ctx}
@@ -103,8 +105,7 @@ defmodule Merquery.SmartCell do
     pretty_plugins =
       Map.get(attrs, "plugins", [])
       |> Enum.filter(&Map.get(&1, "active"))
-      |> Enum.map(&Merquery.Plugins.plugin_to_module/1)
-      |> Enum.filter(&Code.ensure_loaded?/1)
+      |> Enum.map(fn %{"name" => name} -> String.to_atom("Elixir.#{name}") end)
 
     pretty_options = Map.get(attrs, "options", %{}) |> Map.put_new("params", [])
 
@@ -246,11 +247,11 @@ defmodule Merquery.SmartCell do
   end
 
   def handle_event("refreshPlugins", _, %{assigns: %{fields: fields}} = ctx) do
-    available_plugins = Merquery.Plugins.available_plugins()
+    loaded_plugins = Merquery.Plugins.loaded_plugins()
 
     updated_fields =
       Map.update(fields, "plugins", [], fn plugins ->
-        (plugins ++ available_plugins) |> Enum.uniq_by(&Map.get(&1, "name"))
+        (plugins ++ loaded_plugins) |> Enum.uniq_by(&Map.get(&1, "name"))
       end)
 
     ctx =
@@ -262,20 +263,11 @@ defmodule Merquery.SmartCell do
 
   defp missing_dep(%{"plugins" => plugins}) do
     for %{"name" => name, "active" => true, "version" => version} <- plugins do
-      unless Code.ensure_loaded?(Merquery.Plugins.plugin_to_module(%{"name" => name})) do
+      unless Code.ensure_loaded?(String.to_existing_atom(name)) do
         version
       end
     end
     |> Enum.join("\n")
-  end
-
-  defp existing_atom?(str) when is_binary(str) do
-    try do
-      String.to_existing_atom(str) && true
-    rescue
-      ArgumentError ->
-        false
-    end
   end
 
   defp quoted_var(string), do: {String.to_atom(string), [], nil}

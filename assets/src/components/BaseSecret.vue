@@ -52,12 +52,9 @@ export default {
 
     methods: {
         selectSecret() {
-            console.log("Inside secret select");
-            console.log(this.ctx);
             const preselectName = this.secretInputValue;
             this.ctx.selectSecret(
                 (secretName) => {
-                    console.log(secretName);
                     this.$emit("update:secretInputValue", secretName);
                     this.$emit("update:textInputValue", secretName);
                 },
@@ -70,7 +67,7 @@ export default {
 </script>
 
 <template>
-    <div class="input-icon-container grow">
+    <div class="relative grow">
         <BaseInput v-if="toggleInputValue" :name="secretInputName" :label="label" :value="secretInputValue"
             inputClass="input input-icon" grow=true readonly @click="selectSecret"
             @input="$emit('update:secretInputValue', $event.target.value)" :required="!secretInputValue && required" />
