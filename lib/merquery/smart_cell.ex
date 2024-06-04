@@ -261,6 +261,46 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
+  def handle_event(
+        "addDep",
+        %{"depString" => depString},
+        ctx
+      ) do
+    {dep, _} = Code.eval_string(depString)
+
+    livebook_pids =
+      Node.list(:connected)
+      |> Enum.flat_map(fn n ->
+        :rpc.call(n, :erlang, :processes, [])
+        |> Enum.map(fn pid ->
+          info = :rpc.call(n, Process, :info, [pid])
+          {pid, info}
+        end)
+        |> Enum.filter(fn {_pid, info} ->
+          case info[:dictionary][:"$initial_call"] do
+            {Livebook.Session, _, _} -> true
+            _ -> false
+          end
+        end)
+        |> Enum.map(fn {pid, _} -> pid end)
+      end)
+
+    livebook_pid =
+      livebook_pids
+      |> Enum.find(fn pid ->
+        :sys.get_state(pid)
+        |> Map.get(:client_pids_with_id)
+        |> Enum.any?(fn {_k, v} -> v == ctx.origin end)
+      end)
+
+    GenServer.cast(
+      livebook_pid,
+      {:add_dependencies, [%{dep: dep, config: []}]}
+    )
+
+    {:noreply, ctx}
+  end
+
   defp missing_dep(%{"plugins" => plugins}) do
     for %{"name" => name, "active" => true, "version" => version} <- plugins do
       unless Code.ensure_loaded?(String.to_existing_atom(name)) do
