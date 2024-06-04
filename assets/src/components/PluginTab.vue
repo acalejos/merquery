@@ -49,6 +49,13 @@ export default {
                 plugins: JSON.parse(JSON.stringify(this.modelValue)),
             });
         },
+        addDep(depString, index) {
+            this.showTooltipIndex = index; // Show tooltip for the clicked item
+            setTimeout(() => {
+                this.showTooltipIndex = null; // Hide tooltip after 2 seconds
+            }, 2000);
+            this.ctx.pushEvent("addDep", { depString: depString, plugins: JSON.parse(JSON.stringify(this.modelValue)) })
+        },
         deleteRow(index) {
             this.modelValue.splice(index, 1);
             this.emitModelValueUpdate();
@@ -80,8 +87,8 @@ export default {
 
                                 <h2 class="mt-2 text-base font-semibold leading-6 text-gray-900">Add Plugin</h2>
                                 <p class="mt-1 text-sm text-gray-500">
-                                    Once you find a plugin you want, copy its dependency code, add it to your setup
-                                    cell, and rerun to see it reflected in your plugins list.
+                                    Once you find a plugin you want add it to your setup
+                                    cell and rerun to see it reflected in your plugins list.
                                 </p>
                             </div>
                             <form action="#" class="mt-6 flex">
@@ -114,16 +121,24 @@ export default {
                                     <div class="flex-shrink-0 pr-4">
                                         <span v-if="showTooltipIndex === pluginIdx"
                                             class="p-2 text-sm font-medium text-gray-800 rounded-md -translate-x-1/2 left-1/2 bottom-full mb-2">
-                                            Copied!
+                                            Added!
                                         </span>
-                                        <button v-else="showTooltipIndex === index" type="button"
+                                        <!-- <button v-else="showTooltipIndex === index" type="button"
                                             @click="copyTextToClipboard(plugin.version, pluginIdx)">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                                 stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-500">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                     d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
                                             </svg>
-                                        </button>
+                                        </button> -->
+                                        <div v-else="showTooltipIndex === index" class="ml-2">
+                                            <button class="button-base button-gray whitespace-nowrap py-1 px-2"
+                                                type="button" @click="addDep(plugin.version, pluginIdx)"
+                                                aria-label="add">
+                                                <i class="ri-add-line align-middle mr-1 text-xs" aria-hidden="true"></i>
+                                                <span class="font-normal text-xs">Add</span>
+                                            </button>
+                                        </div>
 
                                     </div>
                                 </li>
@@ -152,7 +167,7 @@ export default {
                 </button>
                 <button type="button" @click="refreshPlugins" title="Reload All Loaded Plugins"
                     class="inline-flex items-center justify-center gap-1.25 w-38 px-4 py-2 text-sm font-medium text-gray-800 bg-blue-100 rounded-md cursor-pointer transition-colors duration-300 ease-in-out hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span>Reresh</span>
+                    <span>Refresh</span>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" class="w-6 h-6">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -185,7 +200,7 @@ export default {
                             </button>
                         </div>
                     </th>
-                    <th class="w-32 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Plugin</th>
+                    <th class="text-left w-32 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Plugin</th>
                     <th class="text-left w-auto py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Description
                     </th>
                     <th class="w-10 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50"></th>
@@ -215,52 +230,5 @@ export default {
                 </tr>
             </tbody>
         </table>
-
-        <!-- <table class="w-full border-collapse mt-4" v-if="modelValue.length > 0">
-            <thead>
-                <tr>
-                    <th
-                        class="w-20 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50 flex items-center space-x-2">
-                        <button type="button" @click="toggleModal" title="Add new plugin from Hex"
-                            class="hover:bg-gray-100 p-1 rounded-lg transition-colors duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" class="w-6 h-6 text-gray-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                        </button>
-                        <button type="button" @click="refreshPlugins" title="Refresh plugins list"
-                            class="hover:bg-gray-100 p-1 rounded-lg transition-colors duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                class="w-5 h-5 text-gray-500">
-                                <path fill-rule="evenodd"
-                                    d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    </th>
-                    <th class="w-1/4 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Plugin</th>
-                    <th class="w-1/3 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Description</th>
-                    <th class="w-10 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="(row, index) in modelValue" :key="index" class="table-row relative">
-                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
-                        <BaseSwitch v-model="row.active" />
-                    </td>
-                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
-                        {{ row.name }}
-                    </td>
-                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
-                        {{ row.description }}
-                    </td>
-                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
-                        <span class="delete-icon" @click="deleteRow(index)">
-                            &#10006; 
-                        </span>
-                    </td>
-                </tr>
-            </tbody>
-        </table> -->
     </div>
 </template>
