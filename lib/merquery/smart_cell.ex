@@ -77,8 +77,7 @@ defmodule Merquery.SmartCell do
     {:ok, payload, ctx}
   end
 
-  @impl true
-  def to_source(attrs) do
+  defp _to_source(attrs, return_req \\ false) do
     using_defaults =
       Enum.all?(
         attrs["steps"]["response_steps"] ++
@@ -191,7 +190,7 @@ defmodule Merquery.SmartCell do
           req =
             Req.Request.new(unquote(req_args))
             |> Req.Request.register_options(unquote(Keyword.keys(pretty_options)))
-            |> Req.update(unquote(pretty_options))
+            |> Req.merge(unquote(pretty_options))
             |> Req.Request.append_request_steps(unquote(request_steps))
             |> Req.Request.append_response_steps(unquote(response_steps))
             |> Req.Request.append_error_steps(unquote(error_steps))
@@ -211,17 +210,25 @@ defmodule Merquery.SmartCell do
       end
 
     blocks =
-      case pretty_plugins do
-        [] ->
+      cond do
+        return_req ->
+          [steps_block]
+
+        pretty_plugins == [] ->
           [steps_block, run_block]
 
-        _ ->
+        true ->
           [steps_block, plugin_block, run_block]
       end
 
     blocks
     |> Enum.map(&Kino.SmartCell.quoted_to_string/1)
     |> Enum.join("\n")
+  end
+
+  @impl true
+  def to_source(attrs) do
+    _to_source(attrs)
   end
 
   @impl true
@@ -258,6 +265,43 @@ defmodule Merquery.SmartCell do
       update(ctx, :fields, fn _ -> updated_fields end)
 
     broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    {:noreply, ctx}
+  end
+
+  def handle_event("importCurlCommand", curlCommand, ctx) do
+    req =
+      curlCommand
+      |> CurlReq.Macro.parse()
+      |> CurlReq.Macro.to_req()
+
+    fields =
+      %{
+        "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
+        "request_type" => req.method |> Atom.to_string(),
+        "params" =>
+          URI.decode_query(req.url.query)
+          |> Enum.map(fn {k, v} -> %{"key" => k, "value" => v, "active" => true} end),
+        "headers" =>
+          req.headers
+          |> Enum.map(fn {k, v} -> %{"key" => k, "value" => v, "active" => true} end),
+        "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
+        "verbs" => Constants.all_verbs(),
+        "steps" => get_default_steps(),
+        "plugins" => Merquery.Plugins.loaded_plugins(),
+        "options" => %{}
+      }
+
+    ctx =
+      update(ctx, :fields, fn _ -> fields end)
+
+    broadcast_event(ctx, "update", %{"fields" => fields})
+    {:noreply, ctx}
+  end
+
+  def handle_event("copyAsCurlCommand", _, %{assigns: %{fields: fields}} = ctx) do
+    {req, _} = _to_source(fields, true) |> Code.eval_string()
+    curlCommand = CurlReq.to_curl(req)
+    broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
     {:noreply, ctx}
   end
 

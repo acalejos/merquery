@@ -12,7 +12,10 @@ export async function init(ctx, info) {
     "https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap"
   );
   const available_plugins = info.available_plugins;
-  const state = reactive(info);
+  const state = reactive({
+    ...info,
+    showCopiedMessage: false,
+  });
   function setValues(fields) {
     for (const field in fields) {
       if (state.fields.hasOwnProperty(field)) {
@@ -28,6 +31,22 @@ export async function init(ctx, info) {
 
   ctx.handleEvent("missing_dep", ({ dep }) => {
     app.missingDep = dep;
+  });
+
+  ctx.handleEvent("copyAsCurlCommand", async (curlCommand) => {
+    if (!navigator.clipboard) {
+      console.error("Clipboard API is not available.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(curlCommand);
+      state.showCopiedMessage = true;
+      setTimeout(() => {
+        state.showCopiedMessage = false;
+      }, 1500);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
   });
 
   ctx.handleSync(() => {

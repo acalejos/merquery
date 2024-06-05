@@ -28,11 +28,11 @@ defmodule Merquery.Plugins do
           {:docs_v1, _, :elixir, _, %{"en" => module_doc}, _, _} ->
             mod = mod |> Module.split() |> Enum.join(".")
             doc = module_doc |> String.split("\n") |> Enum.at(0)
-            [%{"name" => mod, "description" => doc} | acc]
+            [%{"name" => mod, "description" => doc, "active" => true} | acc]
 
           {:docs_v1, _, :elixir, _, :none, _, _} ->
             mod = mod |> Module.split() |> Enum.join(".")
-            [%{"name" => mod, "description" => ""} | acc]
+            [%{"name" => mod, "description" => "", "active" => true} | acc]
 
           {_, _, :erlang, _, _, _, _} ->
             acc
