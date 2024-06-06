@@ -270,31 +270,45 @@ defmodule Merquery.SmartCell do
 
   def handle_event("importCurlCommand", curlCommand, ctx) do
     req =
-      curlCommand
-      |> CurlReq.Macro.parse()
-      |> CurlReq.Macro.to_req()
+      try do
+        curlCommand
+        |> CurlReq.Macro.parse()
+        |> CurlReq.Macro.to_req()
+      rescue
+        MatchError ->
+          nil
+      end
 
-    fields =
-      %{
-        "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
-        "request_type" => req.method |> Atom.to_string(),
-        "params" =>
-          URI.decode_query(req.url.query)
-          |> Enum.map(fn {k, v} -> %{"key" => k, "value" => v, "active" => true} end),
-        "headers" =>
-          req.headers
-          |> Enum.map(fn {k, v} -> %{"key" => k, "value" => v, "active" => true} end),
-        "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
-        "verbs" => Constants.all_verbs(),
-        "steps" => get_default_steps(),
-        "plugins" => Merquery.Plugins.loaded_plugins(),
-        "options" => %{}
-      }
+    unless is_nil(req) do
+      fields =
+        %{
+          "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
+          "request_type" => req.method |> Atom.to_string(),
+          "params" =>
+            URI.decode_query(req.url.query)
+            |> Enum.map(fn {k, v} ->
+              %{"key" => k, "value" => v, "active" => true, "isSecretValue" => false}
+            end),
+          "headers" =>
+            req.headers
+            |> Enum.map(fn {k, v} ->
+              %{"key" => k, "value" => v, "active" => true, "isSecretValue" => false}
+            end),
+          "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
+          "verbs" => Constants.all_verbs(),
+          "steps" => get_default_steps(),
+          "plugins" => Merquery.Plugins.loaded_plugins(),
+          "options" => %{}
+        }
 
-    ctx =
-      update(ctx, :fields, fn _ -> fields end)
+      ctx =
+        update(ctx, :fields, fn _ -> fields end)
 
-    broadcast_event(ctx, "update", %{"fields" => fields})
+      broadcast_event(ctx, "update", %{"fields" => fields})
+    else
+      broadcast_event(ctx, "curlError", %{})
+    end
+
     {:noreply, ctx}
   end
 
@@ -355,52 +369,4 @@ defmodule Merquery.SmartCell do
   end
 
   defp quoted_var(string), do: {String.to_atom(string), [], nil}
-
-  def req_options,
-    do: [
-      # request steps
-      :user_agent,
-      :compressed,
-      :range,
-      :base_url,
-      :params,
-      :path_params,
-      :auth,
-      :form,
-      :json,
-      :compress_body,
-      :checksum,
-      :aws_sigv4,
-
-      # response steps
-      :raw,
-      :http_errors,
-      :decode_body,
-      :decode_json,
-      :redirect,
-      :redirect_trusted,
-      :redirect_log_level,
-      :max_redirects,
-      :retry,
-      :retry_delay,
-      :retry_log_level,
-      :max_retries,
-      :cache,
-      :cache_dir,
-      :plug,
-      :finch,
-      :finch_request,
-      :finch_private,
-      :connect_options,
-      :inet6,
-      :receive_timeout,
-      :pool_timeout,
-      :unix_socket,
-      :redact_auth,
-
-      # TODO: Remove on Req 1.0
-      :output,
-      :follow_redirects,
-      :location_trusted
-    ]
 end

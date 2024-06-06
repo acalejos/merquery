@@ -42,6 +42,7 @@ export default {
     computed: {
         fields() { return this.modelValue.fields },
         missingDep() { return this.modelValue.missing_dep },
+        curlError() { return this.modelValue.curlError },
         showCopiedMessage() { return this.modelValue.showCopiedMessage },
         tabs() {
             return Object.keys(this.tabComponents);
@@ -93,6 +94,10 @@ export default {
         <div class="box box-warning" v-if="missingDep">
             <p>You must add the following dependency:</p>
             <pre><code>{{ missingDep }}</code></pre>
+        </div>
+        <div class="box box-warning" v-if="curlError">
+            <p>Trouble importing from cURL! Invalid cURL command.</p>
+            <!-- <pre><code>{{ curlError }}</code></pre> -->
         </div>
         <form @change="handleFieldChange">
             <div class="border border-gray-300 rounded-md bg-[rgba(248,250,252,0.3)] pb-2 min-h-[500px]">

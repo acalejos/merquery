@@ -15,6 +15,7 @@ export async function init(ctx, info) {
   const state = reactive({
     ...info,
     showCopiedMessage: false,
+    curlError: false,
   });
   function setValues(fields) {
     for (const field in fields) {
@@ -31,6 +32,13 @@ export async function init(ctx, info) {
 
   ctx.handleEvent("missing_dep", ({ dep }) => {
     app.missingDep = dep;
+  });
+
+  ctx.handleEvent("curlError", ({}) => {
+    state.curlError = true;
+    setTimeout(() => {
+      state.curlError = false;
+    }, 3000);
   });
 
   ctx.handleEvent("copyAsCurlCommand", async (curlCommand) => {
