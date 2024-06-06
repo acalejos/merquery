@@ -77,8 +77,7 @@ defmodule Merquery.SmartCell do
     {:ok, payload, ctx}
   end
 
-  @impl true
-  def to_source(attrs) do
+  defp _to_source(attrs, return_req \\ false) do
     using_defaults =
       Enum.all?(
         attrs["steps"]["response_steps"] ++
@@ -191,7 +190,7 @@ defmodule Merquery.SmartCell do
           req =
             Req.Request.new(unquote(req_args))
             |> Req.Request.register_options(unquote(Keyword.keys(pretty_options)))
-            |> Req.update(unquote(pretty_options))
+            |> Req.merge(unquote(pretty_options))
             |> Req.Request.append_request_steps(unquote(request_steps))
             |> Req.Request.append_response_steps(unquote(response_steps))
             |> Req.Request.append_error_steps(unquote(error_steps))
@@ -211,17 +210,25 @@ defmodule Merquery.SmartCell do
       end
 
     blocks =
-      case pretty_plugins do
-        [] ->
+      cond do
+        return_req ->
+          [steps_block]
+
+        pretty_plugins == [] ->
           [steps_block, run_block]
 
-        _ ->
+        true ->
           [steps_block, plugin_block, run_block]
       end
 
     blocks
     |> Enum.map(&Kino.SmartCell.quoted_to_string/1)
     |> Enum.join("\n")
+  end
+
+  @impl true
+  def to_source(attrs) do
+    _to_source(attrs)
   end
 
   @impl true
@@ -261,6 +268,97 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
+  def handle_event("importCurlCommand", curlCommand, ctx) do
+    req =
+      try do
+        curlCommand
+        |> CurlReq.Macro.parse()
+        |> CurlReq.Macro.to_req()
+      rescue
+        MatchError ->
+          nil
+      end
+
+    unless is_nil(req) do
+      fields =
+        %{
+          "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
+          "request_type" => req.method |> Atom.to_string(),
+          "params" =>
+            URI.decode_query(req.url.query)
+            |> Enum.map(fn {k, v} ->
+              %{"key" => k, "value" => v, "active" => true, "isSecretValue" => false}
+            end),
+          "headers" =>
+            req.headers
+            |> Enum.map(fn {k, v} ->
+              %{"key" => k, "value" => v, "active" => true, "isSecretValue" => false}
+            end),
+          "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
+          "verbs" => Constants.all_verbs(),
+          "steps" => get_default_steps(),
+          "plugins" => Merquery.Plugins.loaded_plugins(),
+          "options" => %{}
+        }
+
+      ctx =
+        update(ctx, :fields, fn _ -> fields end)
+
+      broadcast_event(ctx, "update", %{"fields" => fields})
+    else
+      broadcast_event(ctx, "curlError", %{})
+    end
+
+    {:noreply, ctx}
+  end
+
+  def handle_event("copyAsCurlCommand", _, %{assigns: %{fields: fields}} = ctx) do
+    {req, _} = _to_source(fields, true) |> Code.eval_string()
+    curlCommand = CurlReq.to_curl(req)
+    broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
+    {:noreply, ctx}
+  end
+
+  def handle_event(
+        "addDep",
+        %{"depString" => depString},
+        ctx
+      ) do
+    {dep, _} = Code.eval_string(depString)
+
+    livebook_pids =
+      Node.list(:connected)
+      |> Enum.flat_map(fn n ->
+        :rpc.call(n, :erlang, :processes, [])
+        |> Enum.map(fn pid ->
+          info = :rpc.call(n, Process, :info, [pid])
+          {pid, info}
+        end)
+        |> Enum.filter(fn {_pid, info} ->
+          case info[:dictionary][:"$initial_call"] do
+            {Livebook.Session, _, _} -> true
+            _ -> false
+          end
+        end)
+        |> Enum.map(fn {pid, _} -> pid end)
+      end)
+
+    livebook_pid =
+      livebook_pids
+      |> Enum.find(fn pid ->
+        :sys.get_state(pid)
+        |> Map.get(:client_pids_with_id)
+        |> Enum.any?(fn {_k, v} -> v == ctx.origin end)
+      end)
+
+    GenServer.cast(
+      livebook_pid,
+      {:add_dependencies, [%{dep: dep, config: []}]}
+    )
+
+    {:noreply, ctx}
+  end
+
   defp missing_dep(%{"plugins" => plugins}) do
     for %{"name" => name, "active" => true, "version" => version} <- plugins do
       unless Code.ensure_loaded?(String.to_existing_atom(name)) do
@@ -271,52 +369,4 @@ defmodule Merquery.SmartCell do
   end
 
   defp quoted_var(string), do: {String.to_atom(string), [], nil}
-
-  def req_options,
-    do: [
-      # request steps
-      :user_agent,
-      :compressed,
-      :range,
-      :base_url,
-      :params,
-      :path_params,
-      :auth,
-      :form,
-      :json,
-      :compress_body,
-      :checksum,
-      :aws_sigv4,
-
-      # response steps
-      :raw,
-      :http_errors,
-      :decode_body,
-      :decode_json,
-      :redirect,
-      :redirect_trusted,
-      :redirect_log_level,
-      :max_redirects,
-      :retry,
-      :retry_delay,
-      :retry_log_level,
-      :max_retries,
-      :cache,
-      :cache_dir,
-      :plug,
-      :finch,
-      :finch_request,
-      :finch_private,
-      :connect_options,
-      :inet6,
-      :receive_timeout,
-      :pool_timeout,
-      :unix_socket,
-      :redact_auth,
-
-      # TODO: Remove on Req 1.0
-      :output,
-      :follow_redirects,
-      :location_trusted
-    ]
 end

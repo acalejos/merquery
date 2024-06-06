@@ -70,7 +70,7 @@ export default {
         <table class="w-full border-collapse mt-4">
             <thead>
                 <tr>
-                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Active</th>
+                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50"></th>
                     <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Key</th>
                     <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Value</th>
                 </tr>

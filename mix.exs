@@ -29,8 +29,9 @@ defmodule Merquery.MixProject do
       {:kino, "~> 0.12"},
       {:phoenix, "~> 1.7.2", optional: true},
       {:req, "~> 0.4"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:jason, "~> 1.4"}
+      {:ex_doc, ">= 0.0.0", runtime: false},
+      {:jason, "~> 1.4"},
+      {:curl_req, "~> 0.98.0"}
     ]
   end
 
