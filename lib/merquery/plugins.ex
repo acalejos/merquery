@@ -10,6 +10,16 @@ defmodule Merquery.Plugins do
         mod
       end
 
+    attach_exported? = fn mod ->
+      case Code.ensure_loaded(mod) do
+        {:error, :nofile} ->
+          false
+
+        {:module, module} ->
+          function_exported?(module, :attach, 1)
+      end
+    end
+
     # This is mainly used to account for dependencies without having to
     # load all modules
     app_mods =
@@ -17,7 +27,7 @@ defmodule Merquery.Plugins do
           {:ok, modules} = :application.get_key(mod, :modules),
           mod <- modules,
           mod != Req.Steps,
-          function_exported?(Code.ensure_loaded!(mod), :attach, 1) do
+          attach_exported?.(mod) do
         mod
       end
 
@@ -28,11 +38,11 @@ defmodule Merquery.Plugins do
           {:docs_v1, _, :elixir, _, %{"en" => module_doc}, _, _} ->
             mod = mod |> Module.split() |> Enum.join(".")
             doc = module_doc |> String.split("\n") |> Enum.at(0)
-            [%{"name" => mod, "description" => doc} | acc]
+            [%{"name" => mod, "description" => doc, "active" => true} | acc]
 
           {:docs_v1, _, :elixir, _, :none, _, _} ->
             mod = mod |> Module.split() |> Enum.join(".")
-            [%{"name" => mod, "description" => ""} | acc]
+            [%{"name" => mod, "description" => "", "active" => true} | acc]
 
           {_, _, :erlang, _, _, _, _} ->
             acc

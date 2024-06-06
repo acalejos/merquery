@@ -68,7 +68,7 @@ defmodule Mix.Tasks.Merquery.Generate do
           quote do
             Mix.install([
               {:kino, "~> 0.12"},
-              {:merquery, gitub: "acalejos/merquery"}
+              {:merquery, github: "acalejos/merquery"}
             ])
           end
           |> Macro.to_string()
