@@ -4,7 +4,7 @@ defmodule Merquery.Helpers.Field do
   Merquery.SmartCell.
   """
 
-  defstruct [:key, :value, active: true, isSecret: false]
+  defstruct [:key, :value, active: true, type: :plaintext]
 
   def new(val \\ [])
 

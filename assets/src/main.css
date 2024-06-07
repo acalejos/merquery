@@ -68,7 +68,9 @@ pre {
   gap: 16px;
 }
 
-.input {
+.input,
+select.input {
+  width: 100%;
   padding: 8px 12px;
   background-color: var(--gray-50);
   font-size: 0.875rem;
@@ -184,15 +186,6 @@ input[required].empty {
 
 .hidden {
   display: none;
-}
-
-select.input {
-  appearance: none;
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01Ljk5OTg5IDQuOTc2NzFMMTAuMTI0OSAwLjg1MTcwOEwxMS4zMDMyIDIuMDMwMDRMNS45OTk4OSA3LjMzMzM3TDAuNjk2NTU1IDIuMDMwMDRMMS44NzQ4OSAwLjg1MTcwOEw1Ljk5OTg5IDQuOTc2NzFaIiBmaWxsPSIjNjE3NThBIi8+Cjwvc3ZnPgo=");
-  background-repeat: no-repeat;
-  background-position: center right 10px;
-  background-size: 10px;
-  padding-right: 28px;
 }
 
 input::-webkit-outer-spin-button,
@@ -359,4 +352,10 @@ input::-webkit-inner-spin-button {
 /* Darken the delete icon color when directly hovered over */
 .delete-icon:hover {
   color: #333; /* Assuming #333 is the darker color you want */
+}
+
+.table-row select {
+  min-width: 213px;
+  width: auto;
+  height: 39px;
 }

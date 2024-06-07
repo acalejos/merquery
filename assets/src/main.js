@@ -16,6 +16,7 @@ export async function init(ctx, info) {
     ...info,
     showCopiedMessage: false,
     curlError: false,
+    bindingOptions: [],
   });
   function setValues(fields) {
     for (const field in fields) {
@@ -39,6 +40,10 @@ export async function init(ctx, info) {
     setTimeout(() => {
       state.curlError = false;
     }, 3000);
+  });
+
+  ctx.handleEvent("set_available_bindings", ({ available_bindings }) => {
+    state.bindingOptions = available_bindings;
   });
 
   ctx.handleEvent("copyAsCurlCommand", async (curlCommand) => {

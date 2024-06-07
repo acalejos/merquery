@@ -90,13 +90,16 @@ defmodule Merquery.SmartCell do
       Map.get(attrs, "headers", [])
       |> Enum.filter(&Map.get(&1, "active"))
       |> Enum.map(fn
-        %{"key" => key, "value" => value, "isSecretValue" => true} ->
+        %{"key" => key, "value" => value, "type" => 1} ->
           secret = "LB_#{value}"
 
           {key, quote(do: System.fetch_env!(unquote(secret)))}
 
-        %{"key" => key, "value" => value} ->
+        %{"key" => key, "value" => value, "type" => 0} ->
           {key, value}
+
+        %{"key" => key, "value" => value, "type" => 2} ->
+          {key, quote(do: unquote(quoted_var(value)))}
       end)
 
     pretty_headers = {:%{}, [], pretty_headers}
@@ -116,16 +119,19 @@ defmodule Merquery.SmartCell do
           value =
             Enum.filter(value, &Map.get(&1, "active"))
             |> Enum.map(fn
-              %{"key" => key, "value" => value, "isSecretValue" => true} ->
+              %{"key" => key, "value" => value, "type" => 1} ->
                 secret = "LB_#{value}"
                 # TODO: Clean this up. Don't like String.to_atom being here. Would rather have
                 # Req.Steps.put_path_params support String keys
                 key = if option in ["path_params"], do: String.to_atom(key), else: key
                 {key, quote(do: System.fetch_env!(unquote(secret)))}
 
-              %{"key" => key, "value" => value} ->
+              %{"key" => key, "value" => value, "type" => 0} ->
                 key = if option in ["path_params"], do: String.to_atom(key), else: key
                 {key, value}
+
+              %{"key" => key, "value" => value, "type" => 2} ->
+                {key, quote(do: unquote(quoted_var(value)))}
             end)
 
           {String.to_existing_atom(option), {:%{}, [], value}}
@@ -237,6 +243,27 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
+  def scan_binding(pid, binding, _env) do
+    available_bindings =
+      for {key, _val} <- binding,
+          is_atom(key),
+          do: %{"label" => Atom.to_string(key), "value" => Atom.to_string(key)}
+
+    send(pid, {:scan_binding_result, available_bindings})
+  end
+
+  @impl true
+  def handle_info({:scan_binding_result, available_bindings}, ctx) do
+    ctx = assign(ctx, available_bindings: available_bindings)
+
+    broadcast_event(ctx, "set_available_bindings", %{
+      "available_bindings" => available_bindings
+    })
+
+    {:noreply, ctx}
+  end
+
+  @impl true
   def handle_event("update_fields", %{} = fields, ctx) do
     ctx = update(ctx, :fields, fn _ -> fields end)
 
@@ -287,12 +314,12 @@ defmodule Merquery.SmartCell do
           "params" =>
             URI.decode_query(req.url.query)
             |> Enum.map(fn {k, v} ->
-              %{"key" => k, "value" => v, "active" => true, "isSecretValue" => false}
+              %{"key" => k, "value" => v, "active" => true, "type" => 0}
             end),
           "headers" =>
             req.headers
             |> Enum.map(fn {k, v} ->
-              %{"key" => k, "value" => v, "active" => true, "isSecretValue" => false}
+              %{"key" => k, "value" => v, "active" => true, "type" => 0}
             end),
           "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
           "verbs" => Constants.all_verbs(),

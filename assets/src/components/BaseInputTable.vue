@@ -12,10 +12,11 @@ export default {
         ctx: Object,
         modelValue: Array,
         currentTab: String,
+        bindingOptions: Array
     },
     data() {
         return {
-            addRow: { active: true, key: "", value: "", isSecretValue: false },
+            addRow: { active: true, key: "", value: "", type: 0 },
             focusedRowIndex: null,
             inputs: {},
         };
@@ -23,7 +24,7 @@ export default {
     computed: {
         newRowIndex() {
             return this.modelValue.length;
-        },
+        }
     },
     methods: {
         handleInput(index, field, value) {
@@ -37,7 +38,7 @@ export default {
                     active: true,
                     key: "",
                     value: "",
-                    isSecretValue: false,
+                    type: 0,
                 };
                 this.$nextTick(() => {
                     this.inputs[`${field}-${index}`].focus();
@@ -89,10 +90,10 @@ export default {
                     </td>
                     <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
                         <BaseSecret :ctx="ctx" :ref="(el) => { inputs['value-' + index] = el; }" textInputName="value"
-                            secretInputName="value" toggleInputName="isSecretValue" label=""
-                            v-model:textInputValue="row.value" v-model:secretInputValue="row.value"
-                            v-model:toggleInputValue="row.isSecretValue" modalTitle="Set value"
-                            @focus="handleFocus(index)" @blur="handleBlur(index)" />
+                            secretInputName="value" toggleInputName="type" label="" v-model:textInputValue="row.value"
+                            v-model:secretInputValue="row.value" v-model:bindingInputValue="row.value"
+                            v-model:toggleInputValue="row.type" modalTitle="Set Value" @focus="handleFocus(index)"
+                            :bindingOptions="bindingOptions" @blur="handleBlur(index)" />
                         <!-- Apply conditional rendering for the delete icon -->
                         <span v-show="focusedRowIndex !== index" class="delete-icon" @click="deleteRow(index)">
                             &#10006; <!-- Simple 'X' icon, can be replaced with an SVG or Font Awesome icon -->
@@ -110,9 +111,9 @@ export default {
                             class="py-2 px-3 mr-2 border border-gray-300 rounded-md text-sm text-gray-600 bg-gray-50 w-full focus:outline-none">
                     </td>
                     <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
-                        <BaseSecret :ctx="ctx" textInputName="value" secretInputName="value"
-                            toggleInputName="isSecretValue" label="" v-model:textInputValue="addRow.value"
-                            v-model:secretInputValue="addRow.value" v-model:toggleInputValue="addRow.isSecretValue"
+                        <BaseSecret :ctx="ctx" textInputName="value" secretInputName="value" toggleInputName="type"
+                            label="" v-model:textInputValue="addRow.value" v-model:secretInputValue="addRow.value"
+                            v-model:toggleInputValue="addRow.type" :bindingOptions="bindingOptions"
                             modalTitle="Set value" @focus="handleFocus(newRowIndex)" @blur="handleBlur(newRowIndex)" />
                     </td>
                 </tr>

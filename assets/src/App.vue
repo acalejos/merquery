@@ -40,6 +40,7 @@ export default {
     },
 
     computed: {
+        bindingOptions() { return this.modelValue.bindingOptions },
         fields() { return this.modelValue.fields },
         missingDep() { return this.modelValue.missing_dep },
         curlError() { return this.modelValue.curlError },
@@ -198,7 +199,8 @@ export default {
 
                     <component :availablePlugins="this.availablePlugins" :ctx="this.ctx" :is="currentTabComponent"
                         v-bind:modelValue="fields[currentTab]" v-bind:currentTab="currentTab"
-                        @update:modelValue="handleFieldChange" v-if="currentTabComponent">
+                        :bindingOptions="bindingOptions" @update:modelValue="handleFieldChange"
+                        v-if="currentTabComponent">
                     </component>
                 </div>
             </div>
