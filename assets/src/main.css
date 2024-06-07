@@ -358,4 +358,5 @@ input::-webkit-inner-spin-button {
   min-width: 213px;
   width: auto;
   height: 39px;
+  padding-left: 40px;
 }

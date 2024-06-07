@@ -114,7 +114,8 @@ export default {
                         <BaseSecret :ctx="ctx" textInputName="value" secretInputName="value" toggleInputName="type"
                             label="" v-model:textInputValue="addRow.value" v-model:secretInputValue="addRow.value"
                             v-model:toggleInputValue="addRow.type" :bindingOptions="bindingOptions"
-                            modalTitle="Set value" @focus="handleFocus(newRowIndex)" @blur="handleBlur(newRowIndex)" />
+                            v-model:bindingInputValue="addRow.value" modalTitle="Set value"
+                            @focus="handleFocus(newRowIndex)" @blur="handleBlur(newRowIndex)" />
                     </td>
                 </tr>
             </tbody>
