@@ -2,6 +2,8 @@
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/ac_alejos?style=social)](https://twitter.com/ac_alejos)
 
+https://github.com/acalejos/merquery/assets/12536734/11cd3b60-62fe-4f4f-ad9a-8afeda3a3a0a
+
 Powered by the wonderful [`Req`](https://hexdocs.pm/req/readme.html) library, Merquery is an interactive and extensible
 HTTP client for [Elixir](https://elixir-lang.org/) and [Livebook](https://livebook.dev/). Conveniently packaged as a Livebook
 SmartCell, you can just add Merquery as a dependency to any Livebook notebook then have access to it under the `Smart` menu
