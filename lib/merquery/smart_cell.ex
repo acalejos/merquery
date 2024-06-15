@@ -237,7 +237,7 @@ defmodule Merquery.SmartCell do
         # If using defaults we can use the high-level API
         quote do
           req =
-            Req.new(unquote(req_args ++ pretty_options))
+            Req.new(unquote(req_args))
         end
       else
         %{
@@ -295,6 +295,11 @@ defmodule Merquery.SmartCell do
           Enum.reduce(unquote(pretty_plugins), req, fn plugin, acc -> plugin.attach(acc) end)
       end
 
+    options_block =
+      quote do
+        req = Req.merge(req, unquote(pretty_options))
+      end
+
     run_block =
       quote do
         {req, unquote(quoted_var(attrs["variable"]))} = Req.request(req)
@@ -304,13 +309,13 @@ defmodule Merquery.SmartCell do
     blocks =
       cond do
         return_req ->
-          [steps_block]
+          [steps_block, options_block]
 
         pretty_plugins == [] ->
-          [steps_block, run_block]
+          [steps_block, options_block, run_block]
 
         true ->
-          [steps_block, plugin_block, run_block]
+          [steps_block, plugin_block, options_block, run_block]
       end
 
     blocks
