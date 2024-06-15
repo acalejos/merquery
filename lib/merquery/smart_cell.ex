@@ -416,6 +416,28 @@ defmodule Merquery.SmartCell do
       end
 
     unless is_nil(req) do
+      contentType =
+        case Map.get(req.headers, "content-type") do
+          [type] ->
+            type
+
+          types when is_list(types) ->
+            hd(types)
+
+          nil ->
+            "none"
+        end
+
+      form =
+        if contentType == "application/x-www-form-urlencoded" do
+          URI.decode_query(req.body)
+          |> Enum.map(fn {k, v} ->
+            %{"key" => k, "value" => v, "active" => true, "type" => 0}
+          end)
+        else
+          []
+        end
+
       fields =
         %{
           "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
@@ -434,7 +456,16 @@ defmodule Merquery.SmartCell do
           "verbs" => Constants.all_verbs(),
           "steps" => get_default_steps(),
           "plugins" => Merquery.Plugins.loaded_plugins(),
-          "options" => %{}
+          "options" => %{},
+          "body" => %{
+            "contentType" => contentType,
+            "form" => form,
+            "raw" =>
+              if(contentType in ["none", "application/x-www-form-urlencoded"],
+                do: "",
+                else: req.body
+              )
+          }
         }
 
       ctx =
