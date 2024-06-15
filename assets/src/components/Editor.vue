@@ -25,12 +25,12 @@ const getLanguageExtension = (language) => {
             return [];
     }
 };
-const props = defineProps({ modelValue: Object, ctx: Object });
+const props = defineProps({ modelValue: Object, ctx: Object, target: String });
 const cm = ref();
 const lang = computed(() => getLanguageExtension(props.modelValue.contentType));
-const dark = ref(
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-);
+// const dark = ref(
+//     window.matchMedia('(prefers-color-scheme: dark)').matches
+// );
 
 const onChange = (_state) => {
     switch (props.modelValue.contentType) {
@@ -38,13 +38,13 @@ const onChange = (_state) => {
             try {
                 const parsedObject = JSON5.parse(props.modelValue.raw);
                 const jsonStringified = JSON.stringify(parsedObject, null, 2);
-                props.ctx.pushEvent("updateRaw", jsonStringified);
+                props.ctx.pushEvent("updateRaw", { raw: jsonStringified, target: props.target });
             } catch {
-                props.ctx.pushEvent("updateRaw", props.modelValue.raw);
+                props.ctx.pushEvent("updateRaw", { raw: props.modelValue.raw, target: props.target });
             }
             break;
         default:
-            props.ctx.pushEvent("updateRaw", props.modelValue.raw);
+            props.ctx.pushEvent("updateRaw", { raw: props.modelValue.raw, target: props.target });
     }
 };
 

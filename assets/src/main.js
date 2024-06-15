@@ -28,6 +28,7 @@ export async function init(ctx, info) {
     }
   }
   ctx.handleEvent("update", ({ fields }) => {
+    console.log(fields);
     setValues(fields);
   });
 

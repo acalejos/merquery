@@ -56,7 +56,7 @@ defmodule Merquery.SmartCell do
       "verbs" => attrs["verbs"] || Constants.all_verbs(),
       "steps" => default_steps,
       "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.loaded_plugins()),
-      "options" => Map.get(attrs, "options", %{})
+      "options" => attrs["options"] || %{"raw" => "", "contentType" => "elixir"}
     }
   end
 
@@ -124,36 +124,29 @@ defmodule Merquery.SmartCell do
       |> Enum.filter(&Map.get(&1, "active"))
       |> Enum.map(fn %{"name" => name} -> String.to_atom("Elixir.#{name}") end)
 
-    pretty_options = Map.get(attrs, "options", %{}) |> Map.put_new("params", [])
-
     pretty_options =
-      pretty_options
-      |> Map.update("params", [], fn params -> params ++ Map.get(attrs, "params", []) end)
-      |> Enum.map(fn
-        {option, value} when is_list(value) ->
-          value =
-            Enum.filter(value, &Map.get(&1, "active"))
-            |> Enum.map(fn
-              %{"key" => key, "value" => value, "type" => 1} ->
-                secret = "LB_#{value}"
-                # TODO: Clean this up. Don't like String.to_atom being here. Would rather have
-                # Req.Steps.put_path_params support String keys
-                key = if option in ["path_params"], do: String.to_atom(key), else: key
-                {key, quote(do: System.fetch_env!(unquote(secret)))}
+      try do
+        bindings =
+          if Map.has_key?(attrs, "ets_id") do
+            [{"binding", bindings}] =
+              :ets.lookup(Map.fetch!(attrs, "ets_id"), "binding")
 
-              %{"key" => key, "value" => value, "type" => 0} ->
-                key = if option in ["path_params"], do: String.to_atom(key), else: key
-                {key, value}
+            bindings
+          else
+            []
+          end
 
-              %{"key" => key, "value" => value, "type" => 2} ->
-                {key, quote(do: unquote(quoted_var(value)))}
-            end)
+        {body, _bindings} = Code.eval_string(get_in(attrs, ["options", "raw"]), bindings)
 
-          {String.to_existing_atom(option), {:%{}, [], value}}
-
-        {option, value} ->
-          {option, value}
-      end)
+        if Keyword.keyword?(body) do
+          body
+        else
+          []
+        end
+      rescue
+        _ ->
+          []
+      end
 
     body =
       attrs
@@ -380,10 +373,22 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
-  def handle_event("updateRaw", newRaw, ctx) do
+  def handle_event("updateRaw", %{"raw" => newRaw, "target" => target}, ctx) do
     ctx =
       update(ctx, :fields, fn fields ->
-        update_in(fields, ["body", "raw"], fn _raw -> newRaw end)
+        update_in(fields, [target, "raw"], fn _raw -> newRaw end)
+      end)
+
+    {:noreply, ctx}
+  end
+
+  def handle_event("updateOptions", newRaw, %{assigns: %{fields: fields}} = ctx) do
+    updated_fields =
+      Map.update(fields, "options", "", fn _options -> newRaw end)
+
+    ctx =
+      update(ctx, :fields, fn _fields ->
+        updated_fields
       end)
 
     {:noreply, ctx}
@@ -456,7 +461,6 @@ defmodule Merquery.SmartCell do
           "verbs" => Constants.all_verbs(),
           "steps" => get_default_steps(),
           "plugins" => Merquery.Plugins.loaded_plugins(),
-          "options" => %{},
           "body" => %{
             "contentType" => contentType,
             "form" => form,
@@ -465,7 +469,8 @@ defmodule Merquery.SmartCell do
                 do: "",
                 else: req.body
               )
-          }
+          },
+          "options" => %{"raw" => "", "contentType" => "elixir"}
         }
 
       ctx =

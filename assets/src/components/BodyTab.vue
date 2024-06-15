@@ -69,9 +69,6 @@ export default {
         };
     },
     methods: {
-        handleFieldChange(_event) {
-            this.ctx.pushEvent("update_fields", JSON.parse(JSON.stringify(this.modelValue)));
-        },
         async formatContent() {
             try {
                 const formatted = await prettier.format(this.modelValue.raw, this.contentTypes[this.modelValue.contentType].options);
@@ -137,7 +134,7 @@ export default {
             <BaseInputTable v-else-if="modelValue.contentType == 'application/x-www-form-urlencoded'"
                 v-bind:modelValue="modelValue.form" :bindingOptions="bindingOptions" :ctx="ctx" />
             <div v-else class="p-4">
-                <Editor v-bind:modelValue="modelValue" @update:modelValue="handleFieldChange" :ctx="ctx" />
+                <Editor v-bind:modelValue="modelValue" :ctx="ctx" target="body" />
             </div>
         </div>
     </div>

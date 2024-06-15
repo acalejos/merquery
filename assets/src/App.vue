@@ -36,8 +36,8 @@ export default {
                 headers: BaseInputTable,
                 body: BodyTab,
                 steps: StepsTab,
-                plugins: PluginTab,
-                // options: OptionsTab,
+                options: OptionsTab,
+                plugins: PluginTab
             },
         };
     },
