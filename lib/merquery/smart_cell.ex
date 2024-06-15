@@ -448,10 +448,14 @@ defmodule Merquery.SmartCell do
           "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
           "request_type" => req.method |> Atom.to_string(),
           "params" =>
-            URI.decode_query(req.url.query)
-            |> Enum.map(fn {k, v} ->
-              %{"key" => k, "value" => v, "active" => true, "type" => 0}
-            end),
+            if(req.url.query,
+              do:
+                URI.decode_query(req.url.query)
+                |> Enum.map(fn {k, v} ->
+                  %{"key" => k, "value" => v, "active" => true, "type" => 0}
+                end),
+              else: []
+            ),
           "headers" =>
             req.headers
             |> Enum.map(fn {k, v} ->
