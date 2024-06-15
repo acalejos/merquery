@@ -28,7 +28,7 @@ export default {
 </script>
 
 <template>
-    <div>
+    <div class="w-full">
         <fieldset class="mt-4 ml-4">
             <legend class="sr-only">Step Type</legend>
             <div class="sm:flex sm:items-center sm:space-x-3">
@@ -40,24 +40,23 @@ export default {
                 </div>
             </div>
         </fieldset>
-
-        <table class="w-full border-collapse mt-4">
-            <thead>
-                <tr>
-                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50"></th>
-                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Step</th>
-                    <th class="py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Description</th>
+        <table class="w-full text-left border-collapse mt-4 h-[184px]">
+            <thead class="flex w-full">
+                <tr class="w-full flex mb-4">
+                    <th class="pl-16 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50"></th>
+                    <th class="w-1/5 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Step</th>
+                    <th class="w-4/5 py-2 px-3 border-b border-gray-200 text-gray-800 bg-gray-50">Description</th>
                 </tr>
             </thead>
-            <tbody>
-                <tr v-for="(row, index) in currentSteps" :key="index">
+            <tbody class="flex w-full flex-col items-center justify-between overflow-y-auto h-full">
+                <tr class="w-full flex" v-for="(row, index) in currentSteps" :key="index">
                     <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
                         <BaseSwitch v-model="row.active" />
                     </td>
-                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
+                    <td class="w-1/5 py-2 px-3 border-b border-gray-200 text-gray-600">
                         {{ row.name }}
                     </td>
-                    <td class="py-2 px-3 border-b border-gray-200 text-gray-600">
+                    <td class="w-4/5 py-2 px-3 border-b border-gray-200 text-gray-600">
                         {{ row.doc }}
                     </td>
                 </tr>

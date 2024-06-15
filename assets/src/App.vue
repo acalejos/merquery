@@ -2,6 +2,7 @@
 import BaseInput from './components/BaseInput.vue'
 import BaseInputTable from './components/BaseInputTable.vue'
 import BaseSelect from './components/BaseSelect.vue'
+import BodyTab from './components/BodyTab.vue'
 import PluginTab from './components/PluginTab.vue'
 import PluginSearch from './components/PluginSearch.vue'
 import StepsTab from './components/StepsTab.vue'
@@ -20,7 +21,8 @@ export default {
         PluginTab,
         StepsTab,
         OptionsTab,
-        PluginSearch
+        PluginSearch,
+        BodyTab
     },
     data() {
         return {
@@ -32,9 +34,10 @@ export default {
             tabComponents: {
                 params: BaseInputTable,
                 headers: BaseInputTable,
-                plugins: PluginTab,
+                body: BodyTab,
                 steps: StepsTab,
-                options: OptionsTab,
+                plugins: PluginTab,
+                // options: OptionsTab,
             },
         };
     },
@@ -67,7 +70,7 @@ export default {
     },
 
     methods: {
-        handleFieldChange(_event) {
+        handleFieldChange(event) {
             this.ctx.pushEvent("update_fields", JSON.parse(JSON.stringify(this.fields)));
         },
         toggleImportCurlModal() {
@@ -98,11 +101,10 @@ export default {
         </div>
         <div class="box box-warning" v-if="curlError">
             <p>Trouble importing from cURL! Invalid cURL command.</p>
-            <!-- <pre><code>{{ curlError }}</code></pre> -->
         </div>
-        <form @change="handleFieldChange">
-            <div class="border border-gray-300 rounded-md bg-[rgba(248,250,252,0.3)] pb-2 min-h-[500px]">
-                <div class="h-full flex flex-col justify-center">
+        <form class="h-[500px]" @change="handleFieldChange">
+            <div class="h-full border border-gray-300 rounded-md bg-[rgba(248,250,252,0.3)] pb-2">
+                <div class="flex flex-col justify-center">
                     <div class="flex items-center gap-2.5 ml-2.5">
                         <PluginSearch v-bind:showModal="showImportCurlModal" @close="toggleImportCurlModal">
                             <template v-slot:default>
@@ -165,7 +167,7 @@ export default {
 
                 </div>
 
-                <div class="h-full">
+                <div>
                     <div class="row mixed-row">
                         <BaseInput name="url" label="URL" type="text" v-model="fields.url" inputClass="input" :grow />
                     </div>

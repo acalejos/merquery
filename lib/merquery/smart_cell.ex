@@ -44,6 +44,14 @@ defmodule Merquery.SmartCell do
       "request_type" => attrs["request_type"] || "get",
       "params" => attrs["params"] || [],
       "headers" => attrs["headers"] || [],
+      "body" =>
+        attrs["body"] ||
+          %{
+            # Options: ["none", "text/plain","application/json","application/javascript","text/html","application/xml", "application/x-www-form-urlencoded"]
+            "contentType" => "application/json",
+            "raw" => "",
+            "form" => []
+          },
       "url" => attrs["url"] || "",
       "verbs" => attrs["verbs"] || Constants.all_verbs(),
       "steps" => default_steps,
@@ -54,16 +62,23 @@ defmodule Merquery.SmartCell do
 
   @impl true
   def init(attrs \\ %{}, ctx) do
+    ets_id = :ets.new(:bindings, [:public, read_concurrency: true])
     fields = __init__(attrs)
 
     ctx =
       assign(ctx,
+        ets_id: ets_id,
         fields: fields,
         missing_dep: missing_dep(fields),
         available_plugins: Merquery.Plugins.available_plugins()
       )
 
     {:ok, ctx}
+  end
+
+  @impl true
+  def terminate(_reason, %{assigns: %{ets_id: ets_id}}) do
+    :ets.delete(ets_id)
   end
 
   @impl true
@@ -140,11 +155,89 @@ defmodule Merquery.SmartCell do
           {option, value}
       end)
 
-    req_args = [
-      method: String.to_atom(attrs["request_type"]),
-      url: attrs["url"],
-      headers: pretty_headers
-    ]
+    body =
+      attrs
+      |> Map.get("body", %{"contentType" => "none"})
+
+    content_type =
+      body
+      |> Map.get("contentType")
+
+    raw = Map.get(body, "raw")
+    form = Map.get(body, "form")
+
+    pretty_body =
+      case content_type do
+        "none" ->
+          []
+
+        "elixir" ->
+          try do
+            bindings =
+              if Map.has_key?(attrs, "ets_id") do
+                [{"binding", bindings}] =
+                  :ets.lookup(Map.fetch!(attrs, "ets_id"), "binding")
+
+                bindings
+              else
+                []
+              end
+
+            {body, _bindings} = Code.eval_string(raw, bindings)
+            [body: body]
+          rescue
+            _ ->
+              [body: raw]
+          end
+
+        "text/plain" ->
+          [body: raw]
+
+        "application/json" ->
+          case Jason.decode(raw) do
+            {:ok, json} ->
+              [json: json]
+
+            {:error, _} ->
+              [body: raw]
+          end
+
+        "application/javascript" ->
+          [body: raw]
+
+        "text/html" ->
+          [body: raw]
+
+        "application/xml" ->
+          [body: raw]
+
+        "application/x-www-form-urlencoded" ->
+          form_data =
+            form
+            |> Enum.filter(&Map.get(&1, "active"))
+            |> Enum.map(fn
+              %{"key" => key, "value" => value, "type" => 1} ->
+                secret = "LB_#{value}"
+
+                {key, quote(do: System.fetch_env!(unquote(secret)))}
+
+              %{"key" => key, "value" => value, "type" => 0} ->
+                {key, value}
+
+              %{"key" => key, "value" => value, "type" => 2} ->
+                {key, quote(do: unquote(quoted_var(value)))}
+            end)
+
+          form_data = {:%{}, [], form_data}
+          [form: form_data]
+      end
+
+    req_args =
+      [
+        method: String.to_atom(attrs["request_type"]),
+        url: attrs["url"],
+        headers: pretty_headers
+      ] ++ pretty_body
 
     steps_block =
       if using_defaults do
@@ -238,23 +331,30 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def to_attrs(%{assigns: %{fields: fields}}) do
-    fields
+  def to_attrs(%{assigns: %{fields: fields} = assigns}) do
+    if Map.has_key?(assigns, :ets_id) do
+      Map.put(fields, "ets_id", Map.fetch!(assigns, :ets_id))
+    else
+      fields
+    end
   end
 
   @impl true
   def scan_binding(pid, binding, _env) do
+    send(pid, {:scan_binding_result, binding})
+  end
+
+  @impl true
+  def handle_info({:scan_binding_result, binding}, %{assigns: %{ets_id: ets_id}} = ctx) do
+    :ets.insert(ets_id, {"binding", binding})
+
     available_bindings =
       for {key, _val} <- binding,
           is_atom(key),
           do: %{"label" => Atom.to_string(key), "value" => Atom.to_string(key)}
 
-    send(pid, {:scan_binding_result, available_bindings})
-  end
-
-  @impl true
-  def handle_info({:scan_binding_result, available_bindings}, ctx) do
-    ctx = assign(ctx, available_bindings: available_bindings)
+    ctx =
+      assign(ctx, available_bindings: available_bindings)
 
     broadcast_event(ctx, "set_available_bindings", %{
       "available_bindings" => available_bindings
@@ -276,6 +376,15 @@ defmodule Merquery.SmartCell do
         broadcast_event(ctx, "missing_dep", %{"dep" => missing_dep})
         assign(ctx, missing_dep: missing_dep)
       end
+
+    {:noreply, ctx}
+  end
+
+  def handle_event("updateRaw", newRaw, ctx) do
+    ctx =
+      update(ctx, :fields, fn fields ->
+        update_in(fields, ["body", "raw"], fn _raw -> newRaw end)
+      end)
 
     {:noreply, ctx}
   end
@@ -396,4 +505,10 @@ defmodule Merquery.SmartCell do
   end
 
   defp quoted_var(string), do: {String.to_atom(string), [], nil}
+end
+
+defimpl Kino.Render, for: Req.Response do
+  def to_livebook(response) do
+    Kino.Tree.new(response) |> Kino.Render.to_livebook()
+  end
 end
