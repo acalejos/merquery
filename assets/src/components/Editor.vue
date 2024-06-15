@@ -8,7 +8,6 @@ import { json } from '@codemirror/lang-json';
 import { html } from '@codemirror/lang-html';
 import { xml } from '@codemirror/lang-xml';
 import { elixir } from 'codemirror-lang-elixir';
-import { oneDark } from '@codemirror/theme-one-dark';
 
 const getLanguageExtension = (language) => {
     switch (language) {
@@ -20,30 +19,13 @@ const getLanguageExtension = (language) => {
             return html();
         case 'application/xml':
             return xml();
-        case 'text/plain':
-            return [];
         case 'elixir':
             return elixir();
         default:
             return [];
     }
 };
-
-const formatCode = (code, language) => {
-    switch (language) {
-        case 'application/javascript':
-            return prettier.format(code, { parser: 'babel', plugins: [parserBabel] });
-        case 'application/json':
-            return prettier.format(code, { parser: 'json', plugins: [parserBabel] });
-        case 'text/html':
-            return prettier.format(code, { parser: 'html', plugins: [parserHtml] });
-        case 'application/xml':
-            return prettier.format(code, { parser: 'xml', plugins: [parserXml] });
-        default:
-            return code;
-    }
-};
-const props = defineProps({ dark: Boolean, modelValue: Object, ctx: Object });
+const props = defineProps({ modelValue: Object, ctx: Object });
 const cm = ref();
 const lang = computed(() => getLanguageExtension(props.modelValue.contentType));
 const dark = ref(
@@ -83,12 +65,5 @@ const baseTheme = EditorView.baseTheme({
 </script>
 
 <template>
-    <code-mirror ref="cm" v-model="modelValue.raw" basic :dark="false" :lang="lang" @change="onChange"
-        :extensions="[baseTheme]" />
+    <code-mirror ref="cm" v-model="modelValue.raw" basic :lang="lang" @change="onChange" :extensions="[baseTheme]" />
 </template>
-
-<style scoped>
-#editor {
-    height: 100%;
-}
-</style>

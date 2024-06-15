@@ -2,8 +2,6 @@
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/ac_alejos?style=social)](https://twitter.com/ac_alejos)
 
-![Demo](merquery_demo.gif)
-
 Merquery currently consists of 2 components:
 
 * `Merquery` Smart Cell that provides an interactive way to work with HTTP requests, akin to Postman
@@ -18,20 +16,6 @@ It also can be used to generate source code just as all Smart Cells do. You can 
 as a learning tool to learn how to use Elixir HTTP clients.
 
 ## Installation
-
-The package can be installed
-by adding `merquery` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:merquery, "~> 0.1.0"}
-  ]
-end
-```
-
-Due to how early in development this project is, I recommend you instead install via
-GitHub, since I am currently unsure how often I will publish Hex releases:
 
 ```elixir
 def deps do
@@ -55,7 +39,7 @@ You may submit feature requests in the form of a GitHub issue.
 
 These are just some ideas for features I currently have, but are subject to change:
 
-* [ ] Finish basic REST operations support
+* [X] Finish basic REST operations support
 * [X] Registering custom plugins
 * [ ] Improve `mix merquery.generate`
   * [X] Allow customized parameters for routes, etc.
