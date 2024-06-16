@@ -418,8 +418,7 @@ defmodule Merquery.SmartCell do
     req =
       try do
         curlCommand
-        |> CurlReq.Macro.parse()
-        |> CurlReq.Macro.to_req()
+        |> CurlReq.from_curl()
       rescue
         MatchError ->
           nil
