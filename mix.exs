@@ -31,7 +31,7 @@ defmodule Merquery.MixProject do
       {:req, "~> 0.4"},
       {:ex_doc, ">= 0.0.0", runtime: false},
       {:jason, "~> 1.4"},
-      {:curl_req, "~> 0.98.0"}
+      {:curl_req, github: "derekkraan/curl_req"}
     ]
   end
 

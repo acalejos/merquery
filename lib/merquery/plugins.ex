@@ -114,6 +114,11 @@ defmodule Merquery.Plugins do
         "name" => "ReqSnowflake",
         "version" => ~s({:req_snowflake, github: "joshuataylor/req_snowflake"}),
         "description" => "An Elixir driver for Snowflake, the cloud data platform."
+      },
+      %{
+        "name" => "ReqCrawl",
+        "version" => ~s({:req_crawl, "~> 0.2.0"}),
+        "description" => "Req plugins to support common crawling functions."
       }
     ]
     |> Enum.sort_by(&Map.fetch!(&1, "name"))

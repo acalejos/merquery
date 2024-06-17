@@ -56,7 +56,8 @@ defmodule Merquery.SmartCell do
       "verbs" => attrs["verbs"] || Constants.all_verbs(),
       "steps" => default_steps,
       "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.loaded_plugins()),
-      "options" => attrs["options"] || %{"raw" => "", "contentType" => "elixir"}
+      "options" => attrs["options"] || %{"raw" => "", "contentType" => "elixir"},
+      "auth" => %{"type" => 0, "value" => "", "scheme" => "none"}
     }
   end
 
@@ -148,6 +149,43 @@ defmodule Merquery.SmartCell do
           []
       end
 
+    auth = Map.get(attrs, "auth", %{"scheme" => "none"})
+
+    pretty_auth =
+      if Map.get(auth, "scheme", "none") == "none" do
+        []
+      else
+        %{"value" => value, "scheme" => scheme, "type" => type} = auth
+
+        evald_value =
+          case type do
+            1 ->
+              secret = "LB_#{value}"
+
+              quote(do: System.fetch_env!(unquote(secret)))
+
+            0 ->
+              value
+
+            2 ->
+              quote(do: unquote(quoted_var(value)))
+          end
+
+        case scheme do
+          "bearer" ->
+            [auth: {:bearer, evald_value}]
+
+          "basic" ->
+            [auth: {:basic, evald_value}]
+
+          "netrc" ->
+            if String.trim(value) == "", do: [auth: :netrc], else: [auth: {:netrc, evald_value}]
+
+          "string" ->
+            [auth: evald_value]
+        end
+      end
+
     body =
       attrs
       |> Map.get("body", %{"contentType" => "none"})
@@ -230,7 +268,7 @@ defmodule Merquery.SmartCell do
         method: String.to_atom(attrs["request_type"]),
         url: attrs["url"],
         headers: pretty_headers
-      ] ++ pretty_body
+      ] ++ pretty_body ++ pretty_auth
 
     steps_block =
       if using_defaults do
@@ -418,8 +456,7 @@ defmodule Merquery.SmartCell do
     req =
       try do
         curlCommand
-        |> CurlReq.Macro.parse()
-        |> CurlReq.Macro.to_req()
+        |> CurlReq.from_curl()
       rescue
         MatchError ->
           nil
@@ -479,7 +516,9 @@ defmodule Merquery.SmartCell do
                 else: req.body
               )
           },
-          "options" => %{"raw" => "", "contentType" => "elixir"}
+          "options" => %{"raw" => "", "contentType" => "elixir"},
+          # type can be in ["string", "basic", "bearer", "netrc"]
+          "auth" => %{"type" => 0, "value" => "", "scheme" => "none"}
         }
 
       ctx =

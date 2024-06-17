@@ -2,7 +2,7 @@
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/ac_alejos?style=social)](https://twitter.com/ac_alejos)
 
-https://github.com/acalejos/merquery/assets/12536734/11cd3b60-62fe-4f4f-ad9a-8afeda3a3a0a
+<https://github.com/acalejos/merquery/assets/12536734/11cd3b60-62fe-4f4f-ad9a-8afeda3a3a0a>
 
 Powered by the wonderful [`Req`](https://hexdocs.pm/req/readme.html) library, Merquery is an interactive and extensible
 HTTP client for [Elixir](https://elixir-lang.org/) and [Livebook](https://livebook.dev/). Conveniently packaged as a Livebook
@@ -39,6 +39,7 @@ as a learning tool to learn how to use Elixir HTTP clients.
     * `application/xml`
     * `text/html`
     * `text/plain`
+* Auth section to conveniently handle authentication header
 * Includes an escape hatch to passthrough custom options to the `Req` request using the `Options` tab. Accepts an Elixir `Keyword` to
   merge with the top-level options.
 * Convert to code cell (generates Elixir code for the given request)
@@ -104,3 +105,7 @@ deploy the generated livebook from `mix merquery.generate`
 * [X] Move Vue to Composition API and breakout components to SPCs *(EDIT: Keeping options API for now, but moved to using SFCs)*
 * [ ] Import from OpenAPI Spec
 * [X] Import/export to/from cURL
+* [ ] Import/export to/from file (select from prompts)
+* [X] Auth section
+* [ ] Tabs for multiple queries
+* [ ] Query history (could use `scan_eval_result` callback)

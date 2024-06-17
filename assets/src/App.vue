@@ -1,4 +1,5 @@
 <script>
+import AuthTab from './components/AuthTab.vue'
 import BaseInput from './components/BaseInput.vue'
 import BaseInputTable from './components/BaseInputTable.vue'
 import BaseSelect from './components/BaseSelect.vue'
@@ -22,7 +23,8 @@ export default {
         StepsTab,
         OptionsTab,
         PluginSearch,
-        BodyTab
+        BodyTab,
+        AuthTab
     },
     data() {
         return {
@@ -33,6 +35,7 @@ export default {
             currentTab: "params",
             tabComponents: {
                 params: BaseInputTable,
+                auth: AuthTab,
                 headers: BaseInputTable,
                 body: BodyTab,
                 steps: StepsTab,
