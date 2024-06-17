@@ -485,6 +485,13 @@ defmodule Merquery.SmartCell do
           []
         end
 
+      auth =
+        case Req.Request.get_option(req, :auth) do
+          {:bearer, token} -> %{"type" => 0, "value" => token, "scheme" => "bearer"}
+          {:basic, credentials} -> %{"type" => 0, "value" => credentials, "scheme" => "basic"}
+          _ -> %{"type" => 0, "value" => "", "scheme" => ""}
+        end
+
       fields =
         %{
           "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
@@ -518,7 +525,7 @@ defmodule Merquery.SmartCell do
           },
           "options" => %{"raw" => "", "contentType" => "elixir"},
           # type can be in ["string", "basic", "bearer", "netrc"]
-          "auth" => %{"type" => 0, "value" => "", "scheme" => "none"}
+          "auth" => auth
         }
 
       ctx =
