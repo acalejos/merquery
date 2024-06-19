@@ -63,7 +63,26 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def init(attrs \\ %{}, ctx) do
+  def init(attrs \\ %{}, ctx)
+
+  def init(%{"queries" => []}, ctx) do
+    init(%{}, ctx)
+  end
+
+  def init(%{"queries" => queries} = attrs, ctx) do
+    fields = %{"queries" => queries, "queryIndex" => attrs["queryIndex"] || 0}
+
+    ctx =
+      assign(ctx,
+        fields: fields,
+        missing_dep: missing_dep(fields),
+        available_plugins: Merquery.Plugins.available_plugins()
+      )
+
+    {:ok, ctx}
+  end
+
+  def init(attrs = %{}, ctx) do
     new_query = __init__(attrs)
     fields = %{"queries" => [new_query], "queryIndex" => 0}
 
@@ -361,8 +380,8 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def to_attrs(%{assigns: %{fields: fields} = assigns, origin: origin} = ctx) do
-    Map.put(fields, "origin", origin)
+  def to_attrs(%{assigns: %{fields: fields}}) do
+    fields
   end
 
   @impl true
@@ -371,7 +390,7 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def handle_info({:scan_binding_result, binding}, %{origin: origin} = ctx) do
+  def handle_info({:scan_binding_result, binding}, ctx) do
     State.update_bindings(binding)
 
     available_bindings =
