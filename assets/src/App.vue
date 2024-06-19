@@ -33,6 +33,8 @@ export default {
             grow: true,
             inline: true,
             currentTab: "params",
+            selectedTab: 0,
+            shouldStick: false,
             tabComponents: {
                 params: BaseInputTable,
                 auth: AuthTab,
@@ -42,12 +44,20 @@ export default {
                 options: OptionsTab,
                 plugins: PluginTab
             },
+            methodDetails: {
+                get: { color: "text-green-500", label: "GET" },
+                post: { color: "text-yellow-500", label: "POST" },
+                delete: { color: "text-red-500", label: "DEL" },
+                options: { color: "text-purple-500", label: "OPT" },
+                head: { color: "text-gray-500", label: "HEAD" },
+                put: { color: "text-blue-500", label: "PUT" },
+                patch: { color: "text-pink-500", label: "PATCH" }
+            }
         };
     },
-
     computed: {
         bindingOptions() { return this.modelValue.bindingOptions },
-        fields() { return this.modelValue.fields },
+        fields() { return this.modelValue.fields.queries[this.modelValue.fields.queryIndex]; },
         missingDep() { return this.modelValue.missing_dep },
         curlError() { return this.modelValue.curlError },
         showCopiedMessage() { return this.modelValue.showCopiedMessage },
@@ -71,7 +81,13 @@ export default {
             };
         },
     },
-
+    mounted() {
+        this.checkWidth();
+        window.addEventListener('resize', this.checkWidth);
+    },
+    beforeDestroy() {
+        window.removeEventListener('resize', this.checkWidth);
+    },
     methods: {
         handleFieldChange(event) {
             this.ctx.pushEvent("update_fields", JSON.parse(JSON.stringify(this.fields)));
@@ -91,6 +107,42 @@ export default {
             const textarea = event.target;
             textarea.style.height = 'auto';
             textarea.style.height = textarea.scrollHeight + 'px';  // Set the height to scroll height
+        },
+        queryAt(index) {
+            return this.modelValue.fields.queries[index];
+        },
+        selectTab(index) {
+            this.modelValue.fields.queryIndex = index;
+            this.ctx.pushEvent("selectQueryTab", index);
+        },
+        addTab() {
+            this.ctx.pushEvent("addQueryTab");
+            this.$nextTick(() => {
+                const container = this.$refs.scrollContainer;
+                if (container) {
+                    // Scroll to the rightmost edge of the container
+                    setTimeout(() => {
+                        const container = this.$refs.scrollContainer;
+                        container.style.overflowX = 'hidden';
+                        if (container) {
+                            container.scrollLeft = container.scrollWidth;
+                        }
+                        container.style.overflowX = 'auto';
+                    }, 50);
+                }
+            });
+        },
+        deleteTab(index) {
+            this.ctx.pushEvent("deleteQueryTab", index);
+        },
+        checkWidth() {
+            const totalWidth = this.$refs.tabsContainer.querySelector('.flex').offsetWidth;
+            const containerWidth = this.$refs.tabsContainer.offsetWidth;
+            if (totalWidth > containerWidth) {
+                this.shouldStick = true;
+            } else {
+                this.shouldStick = false;
+            }
         }
     }
 }
@@ -105,8 +157,48 @@ export default {
         <div class="box box-warning" v-if="curlError">
             <p>Trouble importing from cURL! Invalid cURL command.</p>
         </div>
-        <form class="h-[500px]" @change="handleFieldChange">
-            <div class="h-full border border-gray-300 rounded-md bg-[rgba(248,250,252,0.3)] pb-2">
+        <div v-if="modelValue.fields.queries.length > 0" ref="tabsContainer"
+            class="flex items-center border-gray-200 overflow-hidden">
+            <div ref="scrollContainer" class="flex overflow-x-auto scrollbar-hide">
+                <div class="flex">
+                    <div v-for="(tab, index) in  modelValue.fields.queries " :key="index" :class="[
+            'flex items-center relative min-w-24 max-w-36 cursor-pointer px-2 py-3 border-l truncate border-gray-300 group',
+            modelValue.fields.queryIndex === index ? 'bg-blue-100 text-black font-bold border-t-2 border-t-blue-500' : 'bg-white border-t text-gray-500 mt-0.5'
+        ]" @click.stop="selectTab(index)">
+                        <span :class="['text-xs mr-2', this.methodDetails[queryAt(index).request_type].color]">
+                            {{ this.methodDetails[queryAt(index).request_type].label }}
+                        </span>
+                        <span class="text-xs truncate">
+                            {{ queryAt(index).url === '' ? 'Untitled Request' : queryAt(index).url }}
+                        </span>
+                        <!-- Delete Button -->
+                        <button @click.stop="deleteTab(index)"
+                            :class="['absolute right-2 top-1/2 transform -translate-y-1/2 hidden group-hover:block p-1 rounded-md',
+            modelValue.fields.queryIndex === index ? 'bg-blue-100 hover:bg-blue-50 text-black font-bold' : 'bg-white hover:bg-gray-50 text-gray-500']"
+                            style="width: 24px; height: 24px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Add Button -->
+            <button @click="addTab" :class="[
+            'mt-0.5 flex-none py-2 border-l px-4 rounded-tr hover:bg-gray-300 flex items-center justify-center',
+            'bg-white text-gray-600 border-gray-200 w-12'  // Set a fixed width of 4rem and initial background to white
+        ]" :style="{ 'position': shouldStick ? 'absolute' : 'static', 'right': '0' }">
+                <!-- Plus Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                        d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z"
+                        clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+        <form v-if="modelValue.fields.queries.length > 0" class="h-[500px]" @change="handleFieldChange">
+            <div class="h-full border-b border-x border-gray-300 rounded-b-md bg-[rgba(248,250,252,0.3)] pb-2">
                 <div class="flex flex-col justify-center">
                     <div class="flex items-center gap-2.5 ml-2.5">
                         <PluginSearch v-bind:showModal="showImportCurlModal" @close="toggleImportCurlModal">
@@ -180,7 +272,8 @@ export default {
                             <label for="tabs" class="sr-only">Select a tab</label>
                             <select id="tabs" name="tabs"
                                 class="block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                                <option v-for="tab in tabs" :key="tab" :selected="currentTab === tab">
+                                <option v-for="      tab       in       tabs      " :key="tab"
+                                    :selected="currentTab === tab">
                                     {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
                                 </option>
                             </select>
@@ -189,7 +282,8 @@ export default {
                         <div class="hidden sm:block">
                             <div class="border-b border-gray-200">
                                 <nav class="-mb-px flex" aria-label="Tabs">
-                                    <button type="button" @click="currentTab = tab" v-for="tab in tabs" :key="tab"
+                                    <button type="button" @click="currentTab = tab"
+                                        v-for="      tab       in       tabs      " :key="tab"
                                         :class="[currentTab === tab ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700', 'w-1/4 border-b-2 py-4 px-1 text-center text-sm font-medium']"
                                         :aria-current="currentTab === tab ? 'page' : undefined">
                                         {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
@@ -207,5 +301,34 @@ export default {
                 </div>
             </div>
         </form>
+        <div v-else class="flex flex-col items-center justify-center mt-12">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
+                <path
+                    d="M5.625 3.75a2.625 2.625 0 1 0 0 5.25h12.75a2.625 2.625 0 0 0 0-5.25H5.625ZM3.75 11.25a.75.75 0 0 0 0 1.5h16.5a.75.75 0 0 0 0-1.5H3.75ZM3 15.75a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75ZM3.75 18.75a.75.75 0 0 0 0 1.5h16.5a.75.75 0 0 0 0-1.5H3.75Z" />
+            </svg>
+
+            <h3 class="mt-2 text-sm font-semibold text-gray-900">No Queries</h3>
+            <p class="mt-1 text-sm text-gray-500">Get started by adding a new query.</p>
+            <div class="mt-6 flex space-x-4">
+                <button type="button" @click="addTab" title="Add new query"
+                    class="inline-flex items-center justify-center gap-1.25 w-38 px-4 py-2 text-sm font-medium text-gray-800 bg-blue-100 rounded-md cursor-pointer transition-colors duration-300 ease-in-out hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span>Add</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                </button>
+            </div>
+        </div>
     </div>
 </template>
+
+<style scoped>
+.group-hover\:flex {
+    display: none;
+}
+
+.group:hover .group-hover\:flex {
+    display: flex;
+}
+</style>

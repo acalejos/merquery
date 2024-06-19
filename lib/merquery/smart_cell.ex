@@ -35,7 +35,7 @@ defmodule Merquery.SmartCell do
     end)
   end
 
-  def __init__(attrs) do
+  def __init__(attrs \\ %{}) do
     default_steps = Map.get(attrs, "steps", get_default_steps())
 
     %{
@@ -57,14 +57,15 @@ defmodule Merquery.SmartCell do
       "steps" => default_steps,
       "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.loaded_plugins()),
       "options" => attrs["options"] || %{"raw" => "", "contentType" => "elixir"},
-      "auth" => %{"type" => 0, "value" => "", "scheme" => "none"}
+      "auth" => attrs["auth"] || %{"type" => 0, "value" => "", "scheme" => "none"}
     }
   end
 
   @impl true
   def init(attrs \\ %{}, ctx) do
     ets_id = :ets.new(:bindings, [:public, read_concurrency: true])
-    fields = __init__(attrs)
+    new_query = __init__(attrs)
+    fields = %{"queries" => [new_query], "queryIndex" => 0}
 
     ctx =
       assign(ctx,
@@ -93,7 +94,20 @@ defmodule Merquery.SmartCell do
     {:ok, payload, ctx}
   end
 
-  defp _to_source(attrs, return_req \\ false) do
+  defp _to_source(attrs, return_req \\ false)
+
+  defp _to_source(%{"queries" => []}, _) do
+    quote do
+      nil
+    end
+    |> Kino.SmartCell.quoted_to_string()
+  end
+
+  defp _to_source(%{"queries" => queries, "queryIndex" => queryIndex}, return_req) do
+    queries |> Enum.at(queryIndex) |> _to_source()
+  end
+
+  defp _to_source(attrs, return_req) do
     using_defaults =
       Enum.all?(
         attrs["steps"]["response_steps"] ++
@@ -400,10 +414,16 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def handle_event("update_fields", %{} = fields, ctx) do
-    ctx = update(ctx, :fields, fn _ -> fields end)
+  def handle_event("update_fields", %{} = payload, ctx) do
+    ctx =
+      update(ctx, :fields, fn %{"queryIndex" => queryIndex} = fields ->
+        fields
+        |> Map.update!("queries", fn queries ->
+          List.update_at(queries, queryIndex, fn _ -> payload end)
+        end)
+      end)
 
-    missing_dep = missing_dep(fields)
+    missing_dep = missing_dep(payload)
 
     ctx =
       if missing_dep == ctx.assigns.missing_dep do
@@ -413,6 +433,74 @@ defmodule Merquery.SmartCell do
         assign(ctx, missing_dep: missing_dep)
       end
 
+    {:noreply, ctx}
+  end
+
+  def handle_event(
+        "addQueryTab",
+        _,
+        %{assigns: %{fields: %{"queries" => queries} = fields}} = ctx
+      ) do
+    updated_fields =
+      fields
+      |> Map.update!("queries", fn queries -> queries ++ [__init__()] end)
+      |> Map.update!("queryIndex", fn _ -> length(queries) end)
+
+    ctx =
+      update(ctx, :fields, fn _ ->
+        updated_fields
+      end)
+
+    broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    {:noreply, ctx}
+  end
+
+  def handle_event(
+        "selectQueryTab",
+        index,
+        %{assigns: %{fields: fields}} = ctx
+      ) do
+    updated_fields =
+      fields
+      |> Map.update!("queryIndex", fn _ -> index end)
+
+    ctx =
+      update(ctx, :fields, fn _ ->
+        updated_fields
+      end)
+
+    broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    {:noreply, ctx}
+  end
+
+  def handle_event(
+        "deleteQueryTab",
+        index,
+        %{assigns: %{fields: %{"queries" => queries} = fields}} = ctx
+      )
+      when is_number(index) do
+    updated_fields =
+      fields
+      |> Map.update!("queries", fn prevQueries -> List.delete_at(prevQueries, index) end)
+      |> Map.update!("queryIndex", fn prevIndex ->
+        cond do
+          prevIndex == index && index == 0 ->
+            0
+
+          prevIndex < index ->
+            prevIndex
+
+          true ->
+            prevIndex - 1
+        end
+      end)
+
+    ctx =
+      update(ctx, :fields, fn _ ->
+        updated_fields
+      end)
+
+    broadcast_event(ctx, "update", %{"fields" => updated_fields})
     {:noreply, ctx}
   end
 
@@ -584,6 +672,12 @@ defmodule Merquery.SmartCell do
     )
 
     {:noreply, ctx}
+  end
+
+  defp missing_dep(%{"queries" => queries, "queryIndex" => queryIndex}) do
+    query = queries |> Enum.at(queryIndex)
+
+    missing_dep(query)
   end
 
   defp missing_dep(%{"plugins" => plugins}) do
