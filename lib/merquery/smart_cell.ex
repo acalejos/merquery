@@ -3,6 +3,7 @@ defmodule Merquery.SmartCell do
   use Kino.JS.Live
   use Kino.SmartCell, name: "Merquery"
   alias Merquery.Helpers.Constants
+  alias Merquery.Helpers.State
 
   defp get_default_steps() do
     {:docs_v1, _annotation, _beam_language, _format, _module_doc, _metadata, docs} =
@@ -63,24 +64,17 @@ defmodule Merquery.SmartCell do
 
   @impl true
   def init(attrs \\ %{}, ctx) do
-    ets_id = :ets.new(:bindings, [:public, read_concurrency: true])
     new_query = __init__(attrs)
     fields = %{"queries" => [new_query], "queryIndex" => 0}
 
     ctx =
       assign(ctx,
-        ets_id: ets_id,
         fields: fields,
         missing_dep: missing_dep(fields),
         available_plugins: Merquery.Plugins.available_plugins()
       )
 
     {:ok, ctx}
-  end
-
-  @impl true
-  def terminate(_reason, %{assigns: %{ets_id: ets_id}}) do
-    :ets.delete(ets_id)
   end
 
   @impl true
@@ -104,7 +98,7 @@ defmodule Merquery.SmartCell do
   end
 
   defp _to_source(%{"queries" => queries, "queryIndex" => queryIndex}, return_req) do
-    queries |> Enum.at(queryIndex) |> _to_source()
+    queries |> Enum.at(queryIndex) |> _to_source(return_req)
   end
 
   defp _to_source(attrs, return_req) do
@@ -142,14 +136,7 @@ defmodule Merquery.SmartCell do
     pretty_options =
       try do
         bindings =
-          if Map.has_key?(attrs, "ets_id") do
-            [{"binding", bindings}] =
-              :ets.lookup(Map.fetch!(attrs, "ets_id"), "binding")
-
-            bindings
-          else
-            []
-          end
+          State.get_bindings()
 
         {body, _bindings} = Code.eval_string(get_in(attrs, ["options", "raw"]), bindings)
 
@@ -219,14 +206,7 @@ defmodule Merquery.SmartCell do
         "elixir" ->
           try do
             bindings =
-              if Map.has_key?(attrs, "ets_id") do
-                [{"binding", bindings}] =
-                  :ets.lookup(Map.fetch!(attrs, "ets_id"), "binding")
-
-                bindings
-              else
-                []
-              end
+              State.get_bindings()
 
             {body, _bindings} = Code.eval_string(raw, bindings)
             [body: body]
@@ -381,12 +361,8 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def to_attrs(%{assigns: %{fields: fields} = assigns}) do
-    if Map.has_key?(assigns, :ets_id) do
-      Map.put(fields, "ets_id", Map.fetch!(assigns, :ets_id))
-    else
-      fields
-    end
+  def to_attrs(%{assigns: %{fields: fields} = assigns, origin: origin} = ctx) do
+    Map.put(fields, "origin", origin)
   end
 
   @impl true
@@ -395,8 +371,8 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def handle_info({:scan_binding_result, binding}, %{assigns: %{ets_id: ets_id}} = ctx) do
-    :ets.insert(ets_id, {"binding", binding})
+  def handle_info({:scan_binding_result, binding}, %{origin: origin} = ctx) do
+    State.update_bindings(binding)
 
     available_bindings =
       for {key, _val} <- binding,
@@ -476,7 +452,7 @@ defmodule Merquery.SmartCell do
   def handle_event(
         "deleteQueryTab",
         index,
-        %{assigns: %{fields: %{"queries" => queries} = fields}} = ctx
+        %{assigns: %{fields: fields}} = ctx
       )
       when is_number(index) do
     updated_fields =
@@ -506,20 +482,8 @@ defmodule Merquery.SmartCell do
 
   def handle_event("updateRaw", %{"raw" => newRaw, "target" => target}, ctx) do
     ctx =
-      update(ctx, :fields, fn fields ->
-        update_in(fields, [target, "raw"], fn _raw -> newRaw end)
-      end)
-
-    {:noreply, ctx}
-  end
-
-  def handle_event("updateOptions", newRaw, %{assigns: %{fields: fields}} = ctx) do
-    updated_fields =
-      Map.update(fields, "options", "", fn _options -> newRaw end)
-
-    ctx =
-      update(ctx, :fields, fn _fields ->
-        updated_fields
+      update(ctx, :fields, fn %{"queryIndex" => queryIndex} = fields ->
+        update_in(fields, ["queries", Access.at(queryIndex), target, "raw"], fn _raw -> newRaw end)
       end)
 
     {:noreply, ctx}
@@ -540,7 +504,11 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
-  def handle_event("importCurlCommand", curlCommand, ctx) do
+  def handle_event(
+        "importCurlCommand",
+        curlCommand,
+        %{assigns: %{fields: %{"queries" => queries} = fields}} = ctx
+      ) do
     req =
       try do
         curlCommand
@@ -580,7 +548,7 @@ defmodule Merquery.SmartCell do
           _ -> %{"type" => 0, "value" => "", "scheme" => ""}
         end
 
-      fields =
+      new_query =
         %{
           "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
           "request_type" => req.method |> Atom.to_string(),
@@ -616,10 +584,17 @@ defmodule Merquery.SmartCell do
           "auth" => auth
         }
 
-      ctx =
-        update(ctx, :fields, fn _ -> fields end)
+      updated_fields =
+        fields
+        |> Map.update!("queries", fn _ -> queries ++ [new_query] end)
+        |> Map.update!("queryIndex", fn _ -> length(queries) end)
 
-      broadcast_event(ctx, "update", %{"fields" => fields})
+      ctx =
+        update(ctx, :fields, fn _ ->
+          updated_fields
+        end)
+
+      broadcast_event(ctx, "update", %{"fields" => updated_fields})
     else
       broadcast_event(ctx, "curlError", %{})
     end
