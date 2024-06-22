@@ -1,4 +1,5 @@
 defmodule Merquery.Plugins do
+  alias Merquery.Schemas.Plugin
   @moduledoc false
 
   def loaded_plugins do
@@ -38,11 +39,11 @@ defmodule Merquery.Plugins do
           {:docs_v1, _, :elixir, _, %{"en" => module_doc}, _, _} ->
             mod = mod |> Module.split() |> Enum.join(".")
             doc = module_doc |> String.split("\n") |> Enum.at(0)
-            [%{"name" => mod, "description" => doc, "active" => true} | acc]
+            [%{name: mod, description: doc, active: false} | acc]
 
           {:docs_v1, _, :elixir, _, :none, _, _} ->
             mod = mod |> Module.split() |> Enum.join(".")
-            [%{"name" => mod, "description" => "", "active" => true} | acc]
+            [%{name: mod, description: "", active: false} | acc]
 
           {_, _, :erlang, _, _, _, _} ->
             acc
@@ -59,68 +60,68 @@ defmodule Merquery.Plugins do
   def available_plugins do
     [
       %{
-        "name" => "ReqEasyHTML",
-        "description" => "Req plugin for EasyHTML",
-        "version" => ~s({:req_easyhtml, "~> 0.1.0"})
+        name: "ReqEasyHTML",
+        description: "Req plugin for EasyHTML",
+        version: ~s({:req_easyhtml, "~> 0.1.0"})
       },
       %{
-        "name" => "ReqS3",
-        "version" => ~s({:req_s3, "~> 0.1.0"}),
-        "description" => "Req plugin for Amazon S3."
+        name: "ReqS3",
+        version: ~s({:req_s3, "~> 0.1.0"}),
+        description: "Req plugin for Amazon S3."
       },
       %{
-        "name" => "ReqHex",
-        "version" => ~s({:req_hex, "~> 0.1.0"}),
-        "description" => "Req plugin for Hex API."
+        name: "ReqHex",
+        version: ~s({:req_hex, "~> 0.1.0"}),
+        description: "Req plugin for Hex API."
       },
       %{
-        "name" => "ReqGitHubOAuth",
-        "description" => "Req plugin for GitHub authentication.",
-        "version" => ~s({:req_github_oauth, "~> 0.1.0"})
+        name: "ReqGitHubOAuth",
+        description: "Req plugin for GitHub authentication.",
+        version: ~s({:req_github_oauth, "~> 0.1.0"})
       },
       %{
-        "name" => "ReqGitHubPaginate",
-        "version" => ~s({:req_github_paginate, github: "acalejos/req_github_paginate"}),
-        "description" => "Parses GitHub's REST Response Link Headers"
+        name: "ReqGitHubPaginate",
+        version: ~s({:req_github_paginate, github: "acalejos/req_github_paginate"}),
+        description: "Parses GitHub's REST Response Link Headers"
       },
       %{
-        "name" => "ReqTelemetry",
-        "version" => ~s({:req_telemetry, "~> 0.0.4"}),
-        "description" => "Req plugin to instrument requests with Telemetry events"
+        name: "ReqTelemetry",
+        version: ~s({:req_telemetry, "~> 0.0.4"}),
+        description: "Req plugin to instrument requests with Telemetry events"
       },
       %{
-        "name" => "ReqFuse",
-        "version" => ~s({:req_fuse, "~> 0.2.3"}),
-        "description" =>
+        name: "ReqFuse",
+        version: ~s({:req_fuse, "~> 0.2.3"}),
+        description:
           "ReqFuse provides circuit-breaking functionality, using fuse, for HTTP requests that use Req. Req: https://github.com/wojtekmach/req Fuse: ttps://github.com/jlouis/fuse"
       },
       %{
-        "name" => "ReqBigQuery",
-        "version" => ~s({:req_bigquery, "~> 0.1.3"}),
-        "description" => "Req plugin for Google BigQuery"
+        name: "ReqBigQuery",
+        version: ~s({:req_bigquery, "~> 0.1.3"}),
+        description: "Req plugin for Google BigQuery"
       },
       %{
-        "name" => "ReqAthena",
-        "version" => ~s({:req_athena, "~> 0.1.5"}),
-        "description" => "Req plugin for AWS Athena"
+        name: "ReqAthena",
+        version: ~s({:req_athena, "~> 0.1.5"}),
+        description: "Req plugin for AWS Athena"
       },
       %{
-        "name" => "ReqSandbox",
-        "version" => ~s({:req_sandbox, "~> 0.1.2"}),
-        "description" =>
-          "ReqSandbox simplifies concurrent, transactional tests for external clients."
+        name: "ReqSandbox",
+        version: ~s({:req_sandbox, "~> 0.1.2"}),
+        description: "ReqSandbox simplifies concurrent, transactional tests for external clients."
       },
       %{
-        "name" => "ReqSnowflake",
-        "version" => ~s({:req_snowflake, github: "joshuataylor/req_snowflake"}),
-        "description" => "An Elixir driver for Snowflake, the cloud data platform."
+        name: "ReqSnowflake",
+        version: ~s({:req_snowflake, github: "joshuataylor/req_snowflake"}),
+        description: "An Elixir driver for Snowflake, the cloud data platform."
       },
       %{
-        "name" => "ReqCrawl",
-        "version" => ~s({:req_crawl, "~> 0.2.0"}),
-        "description" => "Req plugins to support common crawling functions."
+        name: "ReqCrawl",
+        version: ~s({:req_crawl, "~> 0.2.0"}),
+        description: "Req plugins to support common crawling functions."
       }
     ]
-    |> Enum.sort_by(&Map.fetch!(&1, "name"))
+    |> Enum.map(&Plugin.new/1)
+    |> Enum.sort_by(&Map.fetch!(&1, :name))
   end
 end

@@ -29,12 +29,13 @@ export default {
     data() {
         return {
             showImportCurlModal: false,
-            importedCurlCommand: "",
+            importedCurlCommand: null,
             grow: true,
             inline: true,
             currentTab: "params",
             selectedTab: 0,
             shouldStick: false,
+            importFileName: null,
             tabComponents: {
                 params: BaseInputTable,
                 auth: AuthTab,
@@ -93,20 +94,36 @@ export default {
             this.ctx.pushEvent("update_fields", JSON.parse(JSON.stringify(this.fields)));
         },
         toggleImportCurlModal() {
-            this.importedCurlCommand = "";
+            this.importedCurlCommand = null;
             this.showImportCurlModal = !this.showImportCurlModal;
         },
-        importCurlCommand() {
-            this.ctx.pushEvent("importCurlCommand", JSON.parse(JSON.stringify(this.importedCurlCommand)));
+        importQueries() {
+            const fileInput = document.getElementById('importFileInput');
+            if (!fileInput.files.length) {
+                this.importedCurlCommand && this.ctx.pushEvent("importFromString", JSON.parse(JSON.stringify(this.importedCurlCommand)));
+            } else {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+
+                reader.onload = (event) => {
+                    const buffer = event.target.result;
+                    const info = { filename: file.name, mimeType: file.type };
+
+                    this.ctx.pushEvent("importFromFile", [info, buffer]);
+                };
+
+                reader.onerror = function (event) {
+                    console.error("File could not be read! Code " + event.target.error.code);
+                };
+
+                reader.readAsArrayBuffer(file);
+            }
             this.showImportCurlModal = false;
+            this.importedCurlCommand = null;
+            this.importFileName = null;
         },
         copyAsCurl() {
             this.ctx.pushEvent("copyAsCurlCommand");
-        },
-        autoResize(event) {
-            const textarea = event.target;
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';  // Set the height to scroll height
         },
         queryAt(index) {
             return this.modelValue.fields.queries[index];
@@ -143,6 +160,13 @@ export default {
             } else {
                 this.shouldStick = false;
             }
+        },
+        triggerImportFileInput() {
+            this.$refs.importFileInput.click();
+        },
+        handleFileChange(event) {
+            const file = event.target.files[0];
+            this.importFileName = file ? file.name : null;
         }
     }
 }
@@ -155,7 +179,7 @@ export default {
             <pre><code>{{ missingDep }}</code></pre>
         </div>
         <div class="box box-warning" v-if="curlError">
-            <p>Trouble importing from cURL! Invalid cURL command.</p>
+            <p>Trouble importing from! Invalid import content.</p>
         </div>
         <div v-if="modelValue.fields.queries.length > 0" ref="tabsContainer"
             class="flex items-center border-gray-200 overflow-hidden">
@@ -172,15 +196,17 @@ export default {
                             {{ queryAt(index).url === '' ? 'Untitled Request' : queryAt(index).url }}
                         </span>
                         <!-- Delete Button -->
-                        <button @click.stop="deleteTab(index)"
-                            :class="['absolute right-2 top-1/2 transform -translate-y-1/2 hidden group-hover:block p-1 rounded-md',
-            modelValue.fields.queryIndex === index ? 'bg-blue-100 hover:bg-blue-50 text-black font-bold' : 'bg-white hover:bg-gray-50 text-gray-500']"
-                            style="width: 24px; height: 24px;">
+                        <button @click.stop="deleteTab(index)" :class="[
+            'absolute right-2 top-1/2 transform -translate-y-1/2 hidden group-hover:block p-1 rounded-md',
+            modelValue.fields.queryIndex === index ? 'bg-blue-100 hover:bg-blue-50 text-black font-bold' : 'bg-white hover:bg-gray-50 text-gray-500',
+            'focus:outline-none', 'active:bg-gray-200', 'active:shadow-inner'
+        ]" style="width: 24px; height: 24px; transition: background-color 0.2s, box-shadow 0.2s;">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor" stroke-width="2" class="w-4 h-4">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+
                     </div>
                 </div>
             </div>
@@ -197,32 +223,48 @@ export default {
                 </svg>
             </button>
         </div>
-        <form v-if="modelValue.fields.queries.length > 0" class="h-[500px]" @change="handleFieldChange">
+        <div v-if="modelValue.fields.queries.length > 0" class="h-[500px]" @change="handleFieldChange">
             <div class="h-full border-b border-x border-gray-300 rounded-b-md bg-[rgba(248,250,252,0.3)] pb-2">
                 <div class="flex flex-col justify-center">
                     <div class="flex items-center gap-2.5 ml-2.5">
                         <PluginSearch v-bind:showModal="showImportCurlModal" @close="toggleImportCurlModal">
                             <template v-slot:default>
-                                <div class="p-5">
-                                    <h2 class="text-lg font-bold mb-4">Import</h2>
-                                    <form class="flex flex-col space-y-4">
-                                        <label for="search" class="sr-only">Import</label>
-                                        <textarea rows="1" spellcheck="false" wrap="off" id="curlImport"
-                                            @input="autoResize" v-model="importedCurlCommand"
+                                <div class="flex flex-col h-full relative">
+                                    <div class="flex-grow p-4">
+                                        <h2 class="text-lg font-bold mb-4">Import</h2>
+                                        <textarea rows="7" spellcheck="false" wrap="off" id="curlImport"
+                                            v-model="importedCurlCommand"
                                             class="px-4 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 sm:text-sm sm:leading-6"
-                                            placeholder="Paste cURL to import..." />
-                                        <div class="flex justify-end">
-                                            <button type="button" @click="importCurlCommand" title="Import from cURL"
-                                                class="space-x-1 inline-flex items-center justify-center gap-1.25 w-38 px-4 py-2 text-sm font-medium text-gray-800 bg-blue-100 rounded-md cursor-pointer transition-colors duration-300 ease-in-out hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            placeholder="Paste cURL or Merquery JSON to import..." />
+                                        <div class="flex items-center my-4">
+                                            <div class="flex-grow border-t border-gray-300"></div>
+                                            <span class="mx-4 text-sm text-gray-600">Or</span>
+                                            <div class="flex-grow border-t border-gray-300"></div>
+                                        </div>
+                                        <div class="flex justify-center items-center">
+                                            <label
+                                                class="inline-flex flex-col gap-4 p-4 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer">
+                                                <div class="flex justify-center text-gray-500">
+                                                    {{ this.importFileName || "Click to select a file" }}
+                                                </div>
+                                                <input type="file" id="importFileInput" accept="application/json"
+                                                    @change="handleFileChange" ref="fileInput" />
+                                            </label>
+                                        </div>
+                                        <div class="absolute right-2 bottom-2">
+                                            <!-- This :disabled is just an XOR -->
+                                            <button :disabled="!(!importFileName != !importedCurlCommand)" type="button"
+                                                @click="importQueries" title="Import"
+                                                class="ml-auto inline-flex items-center justify-center gap-1.25 px-4 py-2 text-sm font-medium text-gray-800 bg-blue-100 rounded-md cursor-pointer transition-colors duration-300 ease-in-out hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
                                                 <span>Import</span>
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                    stroke-width="1.5" stroke="currentColor" class="size-4">
+                                                    stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
                                                         d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                                 </svg>
                                             </button>
                                         </div>
-                                    </form>
+                                    </div>
                                 </div>
                             </template>
                         </PluginSearch>
@@ -237,9 +279,17 @@ export default {
                         inputClass="input input--xs input-text" :inline />
 
                     <!-- Icon buttons -->
-                    <div class="flex justify-end space-x-2 ml-auto">
-                        <button type="button" class="icon-button" title="Import from cURL"
-                            @click="toggleImportCurlModal">
+                    <div class="flex justify-end space-x-3 ml-auto">
+                        <button type="button" class="icon-button" title="Import" @click="toggleImportCurlModal">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="size-6 text-gray-400">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25" />
+                            </svg>
+
+                        </button>
+                        <button type="button" class="icon-button" title="Download"
+                            @click="ctx.pushEvent('exportAsJson');">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor" class="size-6 text-gray-400">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -300,7 +350,7 @@ export default {
                     </component>
                 </div>
             </div>
-        </form>
+        </div>
         <div v-else class="flex flex-col items-center justify-center mt-12">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
                 <path

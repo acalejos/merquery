@@ -2,95 +2,52 @@ defmodule Merquery.SmartCell do
   use Kino.JS, assets_path: "assets/build"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Merquery"
-  alias Merquery.Helpers.Constants
   alias Merquery.Helpers.State
+  import Merquery.Schema, only: [dump: 1]
 
-  defp get_default_steps() do
-    {:docs_v1, _annotation, _beam_language, _format, _module_doc, _metadata, docs} =
-      Code.fetch_docs(Req.Steps)
-
-    step_to_doc =
-      docs
-      |> Enum.into(%{}, fn {{_kind, name, _rity}, _anno, _signature, doc, _metadata} ->
-        {name,
-         case doc do
-           %{"en" => fn_doc} ->
-             (String.split(fn_doc, ".") |> hd()) <> "."
-
-           _ ->
-             ""
-         end}
-      end)
-
-    req = Req.new()
-
-    Enum.reduce([:request_steps, :response_steps, :error_steps], %{}, fn stage, acc ->
-      steps =
-        req
-        |> Map.get(stage)
-        |> Enum.map(fn {k, _v} ->
-          %{"name" => k, "active" => true, "doc" => Map.get(step_to_doc, k)}
-        end)
-
-      Map.put(acc, Atom.to_string(stage), steps)
-    end)
-  end
-
-  def __init__(attrs \\ %{}) do
-    default_steps = Map.get(attrs, "steps", get_default_steps())
-
-    %{
-      "variable" =>
-        attrs["variable"] || Kino.SmartCell.prefixed_var_name("resp", attrs["variable"]),
-      "request_type" => attrs["request_type"] || "get",
-      "params" => attrs["params"] || [],
-      "headers" => attrs["headers"] || [],
-      "body" =>
-        attrs["body"] ||
-          %{
-            # Options: ["none", "text/plain","application/json","application/javascript","text/html","application/xml", "application/x-www-form-urlencoded"]
-            "contentType" => "application/json",
-            "raw" => "",
-            "form" => []
-          },
-      "url" => attrs["url"] || "",
-      "verbs" => attrs["verbs"] || Constants.all_verbs(),
-      "steps" => default_steps,
-      "plugins" => Map.get(attrs, "plugins", Merquery.Plugins.loaded_plugins()),
-      "options" => attrs["options"] || %{"raw" => "", "contentType" => "elixir"},
-      "auth" => attrs["auth"] || %{"type" => 0, "value" => "", "scheme" => "none"}
-    }
-  end
+  alias Merquery.Schemas.{
+    Steps,
+    Query,
+    Flask,
+    Plugin,
+    Auth,
+    Options,
+    Body
+  }
 
   @impl true
   def init(attrs \\ %{}, ctx)
 
-  def init(%{"queries" => []}, ctx) do
+  def init(%{queries: []}, ctx) do
     init(%{}, ctx)
   end
 
-  def init(%{"queries" => queries} = attrs, ctx) do
-    fields = %{"queries" => queries, "queryIndex" => attrs["queryIndex"] || 0}
+  def init(%{queries: _queries, queryIndex: _queryIndex} = attrs, ctx) do
+    flask = Flask.new(attrs)
 
     ctx =
       assign(ctx,
-        fields: fields,
-        missing_dep: missing_dep(fields),
-        available_plugins: Merquery.Plugins.available_plugins()
+        fields: flask |> dump(),
+        missing_dep: missing_dep(flask),
+        available_plugins:
+          Merquery.Plugins.available_plugins()
+          |> Enum.map(&dump/1)
       )
 
     {:ok, ctx}
   end
 
   def init(attrs = %{}, ctx) do
-    new_query = __init__(attrs)
-    fields = %{"queries" => [new_query], "queryIndex" => 0}
+    new_query = Query.new(attrs) |> dump()
+    flask = Flask.new(%{queries: [new_query], queryIndex: 0})
 
     ctx =
       assign(ctx,
-        fields: fields,
-        missing_dep: missing_dep(fields),
-        available_plugins: Merquery.Plugins.available_plugins()
+        fields: flask |> dump(),
+        missing_dep: missing_dep(flask),
+        available_plugins:
+          Merquery.Plugins.available_plugins()
+          |> Enum.map(&dump/1)
       )
 
     {:ok, ctx}
@@ -109,178 +66,38 @@ defmodule Merquery.SmartCell do
 
   defp _to_source(attrs, return_req \\ false)
 
-  defp _to_source(%{"queries" => []}, _) do
+  defp _to_source(%Flask{queries: []}, _) do
     quote do
       nil
     end
     |> Kino.SmartCell.quoted_to_string()
   end
 
-  defp _to_source(%{"queries" => queries, "queryIndex" => queryIndex}, return_req) do
+  defp _to_source(%Flask{queries: queries, queryIndex: queryIndex}, return_req) do
     queries |> Enum.at(queryIndex) |> _to_source(return_req)
   end
 
-  defp _to_source(attrs, return_req) do
-    using_defaults =
-      Enum.all?(
-        attrs["steps"]["response_steps"] ++
-          attrs["steps"]["request_steps"] ++
-          attrs["steps"]["error_steps"],
-        fn step -> step["active"] end
-      )
+  defp _to_source(query = %Query{}, return_req) do
+    using_defaults = Query.using_default_steps?(query)
 
-    pretty_headers =
-      Map.get(attrs, "headers", [])
-      |> Enum.filter(&Map.get(&1, "active"))
-      |> Enum.map(fn
-        %{"key" => key, "value" => value, "type" => 1} ->
-          secret = "LB_#{value}"
+    pretty_headers = Query.to_quoted(query, :headers)
 
-          {key, quote(do: System.fetch_env!(unquote(secret)))}
+    pretty_params = Query.to_quoted(query, :params)
 
-        %{"key" => key, "value" => value, "type" => 0} ->
-          {key, value}
+    pretty_plugins = Query.to_quoted(query, :plugins)
 
-        %{"key" => key, "value" => value, "type" => 2} ->
-          {key, quote(do: unquote(quoted_var(value)))}
-      end)
+    pretty_options = Query.to_quoted(query, :options)
 
-    pretty_headers = {:%{}, [], pretty_headers}
+    pretty_auth = Query.to_quoted(query, :auth)
 
-    pretty_plugins =
-      Map.get(attrs, "plugins", [])
-      |> Enum.filter(&Map.get(&1, "active"))
-      |> Enum.map(fn %{"name" => name} -> String.to_atom("Elixir.#{name}") end)
-
-    pretty_options =
-      try do
-        bindings =
-          State.get_bindings()
-
-        {body, _bindings} = Code.eval_string(get_in(attrs, ["options", "raw"]), bindings)
-
-        if Keyword.keyword?(body) do
-          body
-        else
-          []
-        end
-      rescue
-        _ ->
-          []
-      end
-
-    auth = Map.get(attrs, "auth", %{"scheme" => "none"})
-
-    pretty_auth =
-      if Map.get(auth, "scheme", "none") == "none" do
-        []
-      else
-        %{"value" => value, "scheme" => scheme, "type" => type} = auth
-
-        evald_value =
-          case type do
-            1 ->
-              secret = "LB_#{value}"
-
-              quote(do: System.fetch_env!(unquote(secret)))
-
-            0 ->
-              value
-
-            2 ->
-              quote(do: unquote(quoted_var(value)))
-          end
-
-        case scheme do
-          "bearer" ->
-            [auth: {:bearer, evald_value}]
-
-          "basic" ->
-            [auth: {:basic, evald_value}]
-
-          "netrc" ->
-            if String.trim(value) == "", do: [auth: :netrc], else: [auth: {:netrc, evald_value}]
-
-          "string" ->
-            [auth: evald_value]
-        end
-      end
-
-    body =
-      attrs
-      |> Map.get("body", %{"contentType" => "none"})
-
-    content_type =
-      body
-      |> Map.get("contentType")
-
-    raw = Map.get(body, "raw")
-    form = Map.get(body, "form")
-
-    pretty_body =
-      case content_type do
-        "none" ->
-          []
-
-        "elixir" ->
-          try do
-            bindings =
-              State.get_bindings()
-
-            {body, _bindings} = Code.eval_string(raw, bindings)
-            [body: body]
-          rescue
-            _ ->
-              [body: raw]
-          end
-
-        "text/plain" ->
-          [body: raw]
-
-        "application/json" ->
-          case Jason.decode(raw) do
-            {:ok, json} ->
-              [json: json]
-
-            {:error, _} ->
-              [body: raw]
-          end
-
-        "application/javascript" ->
-          [body: raw]
-
-        "text/html" ->
-          [body: raw]
-
-        "application/xml" ->
-          [body: raw]
-
-        "application/x-www-form-urlencoded" ->
-          form_data =
-            form
-            |> Enum.filter(&Map.get(&1, "active"))
-            |> Enum.map(fn
-              %{"key" => key, "value" => value, "type" => 1} ->
-                secret = "LB_#{value}"
-
-                {key, quote(do: System.fetch_env!(unquote(secret)))}
-
-              %{"key" => key, "value" => value, "type" => 0} ->
-                {key, value}
-
-              %{"key" => key, "value" => value, "type" => 2} ->
-                {key, quote(do: unquote(quoted_var(value)))}
-            end)
-
-          form_data = {:%{}, [], form_data}
-          [form: form_data]
-      end
+    pretty_body = Query.to_quoted(query, :body)
 
     req_args =
       [
-        method: String.to_atom(attrs["request_type"]),
-        url: attrs["url"],
-        headers: pretty_headers
+        method: query.request_type,
+        url: query.url,
+        headers: pretty_headers,
+        params: pretty_params
       ] ++ pretty_body ++ pretty_auth
 
     steps_block =
@@ -291,28 +108,28 @@ defmodule Merquery.SmartCell do
             Req.new(unquote(req_args))
         end
       else
-        %{
-          "steps" => %{
-            "request_steps" => default_request,
-            "response_steps" => default_response,
-            "error_steps" => default_error
+        %Query{
+          steps: %Steps{
+            request_steps: default_request,
+            response_steps: default_response,
+            error_steps: default_error
           }
-        } = attrs
+        } = query
 
         new_req = Req.new()
 
         request_steps =
           default_request
-          |> Enum.filter(&Map.get(&1, "active", true))
-          |> Enum.map(fn step -> step |> Map.get("name") |> String.to_existing_atom() end)
+          |> Enum.filter(&Map.get(&1, :active, true))
+          |> Enum.map(fn step -> step |> Map.get(:name) |> String.to_existing_atom() end)
 
         request_steps =
           new_req |> Map.get(:request_steps) |> Enum.filter(fn {k, _v} -> k in request_steps end)
 
         response_steps =
           default_response
-          |> Enum.filter(&Map.get(&1, "active", true))
-          |> Enum.map(fn step -> step |> Map.get("name") |> String.to_existing_atom() end)
+          |> Enum.filter(&Map.get(&1, :active, true))
+          |> Enum.map(fn step -> step |> Map.get(:name) |> String.to_existing_atom() end)
 
         response_steps =
           new_req
@@ -321,8 +138,8 @@ defmodule Merquery.SmartCell do
 
         error_steps =
           default_error
-          |> Enum.filter(&Map.get(&1, "active", true))
-          |> Enum.map(fn step -> step |> Map.get("name") |> String.to_existing_atom() end)
+          |> Enum.filter(&Map.get(&1, :active, true))
+          |> Enum.map(fn step -> step |> Map.get(:name) |> String.to_existing_atom() end)
 
         error_steps =
           new_req |> Map.get(:error_steps) |> Enum.filter(fn {k, _v} -> k in error_steps end)
@@ -332,7 +149,6 @@ defmodule Merquery.SmartCell do
         quote do
           req =
             Req.Request.new(unquote(req_args))
-            |> Req.Request.register_options(unquote(Keyword.keys(pretty_options)))
             |> Req.merge(unquote(pretty_options))
             |> Req.Request.append_request_steps(unquote(request_steps))
             |> Req.Request.append_response_steps(unquote(response_steps))
@@ -353,8 +169,8 @@ defmodule Merquery.SmartCell do
 
     run_block =
       quote do
-        {req, unquote(quoted_var(attrs["variable"]))} = Req.request(req)
-        unquote(quoted_var(attrs["variable"]))
+        {req, unquote(quoted_var(query.variable))} = Req.request(req)
+        unquote(quoted_var(query.variable))
       end
 
     blocks =
@@ -375,13 +191,17 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def to_source(attrs) do
-    _to_source(attrs)
+  def to_source(%Flask{} = flask) do
+    _to_source(flask)
+  end
+
+  def to_source(flask = %{}) do
+    _to_source(Flask.new(flask))
   end
 
   @impl true
-  def to_attrs(%{assigns: %{fields: fields}}) do
-    fields
+  def to_attrs(%{assigns: %{fields: flask}}) do
+    flask
   end
 
   @impl true
@@ -409,16 +229,25 @@ defmodule Merquery.SmartCell do
   end
 
   @impl true
-  def handle_event("update_fields", %{} = payload, ctx) do
-    ctx =
-      update(ctx, :fields, fn %{"queryIndex" => queryIndex} = fields ->
-        fields
-        |> Map.update!("queries", fn queries ->
-          List.update_at(queries, queryIndex, fn _ -> payload end)
-        end)
+  def handle_event(
+        event,
+        payload,
+        %{assigns: %{fields: fields}} = ctx
+      ) do
+    flask = Flask.new(fields)
+    handle_event(event, payload, ctx, flask)
+  end
+
+  def handle_event("update_fields", %{} = payload, ctx, %Flask{queryIndex: index} = flask) do
+    flask =
+      flask
+      |> Map.update!(:queries, fn queries ->
+        List.update_at(queries, index, fn _ -> Query.new(payload) end)
       end)
 
-    missing_dep = missing_dep(payload)
+    ctx = assign(ctx, fields: flask |> dump())
+
+    missing_dep = missing_dep(Query.new(payload))
 
     ctx =
       if missing_dep == ctx.assigns.missing_dep do
@@ -434,204 +263,280 @@ defmodule Merquery.SmartCell do
   def handle_event(
         "addQueryTab",
         _,
-        %{assigns: %{fields: %{"queries" => queries} = fields}} = ctx
+        ctx,
+        %Flask{queries: queries} = flask
       ) do
-    updated_fields =
-      fields
-      |> Map.update!("queries", fn queries -> queries ++ [__init__()] end)
-      |> Map.update!("queryIndex", fn _ -> length(queries) end)
+    updated_flask =
+      %{flask | queries: queries ++ [Query.new()], queryIndex: length(queries)}
+      |> dump()
 
     ctx =
       update(ctx, :fields, fn _ ->
-        updated_fields
+        updated_flask
       end)
 
-    broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    broadcast_event(ctx, "update", %{"fields" => updated_flask})
     {:noreply, ctx}
   end
 
   def handle_event(
         "selectQueryTab",
         index,
-        %{assigns: %{fields: fields}} = ctx
+        ctx,
+        %Flask{} = flask
       ) do
-    updated_fields =
-      fields
-      |> Map.update!("queryIndex", fn _ -> index end)
+    updated_flask = %{flask | queryIndex: index} |> dump()
 
     ctx =
       update(ctx, :fields, fn _ ->
-        updated_fields
+        updated_flask
       end)
 
-    broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    broadcast_event(ctx, "update", %{"fields" => updated_flask})
     {:noreply, ctx}
   end
 
   def handle_event(
         "deleteQueryTab",
         index,
-        %{assigns: %{fields: fields}} = ctx
+        ctx,
+        %Flask{queries: prevQueries, queryIndex: prevIndex} = flask
       )
       when is_number(index) do
-    updated_fields =
-      fields
-      |> Map.update!("queries", fn prevQueries -> List.delete_at(prevQueries, index) end)
-      |> Map.update!("queryIndex", fn prevIndex ->
-        cond do
-          prevIndex == index && index == 0 ->
-            0
+    newIndex =
+      cond do
+        prevIndex == index && index == 0 ->
+          0
 
-          prevIndex < index ->
-            prevIndex
+        prevIndex < index ->
+          prevIndex
 
-          true ->
-            prevIndex - 1
-        end
-      end)
+        true ->
+          prevIndex - 1
+      end
+
+    updated_flask =
+      %{flask | queries: List.delete_at(prevQueries, index), queryIndex: newIndex}
+      |> dump()
 
     ctx =
       update(ctx, :fields, fn _ ->
-        updated_fields
+        updated_flask
       end)
 
-    broadcast_event(ctx, "update", %{"fields" => updated_fields})
-    {:noreply, ctx}
-  end
-
-  def handle_event("updateRaw", %{"raw" => newRaw, "target" => target}, ctx) do
-    ctx =
-      update(ctx, :fields, fn %{"queryIndex" => queryIndex} = fields ->
-        update_in(fields, ["queries", Access.at(queryIndex), target, "raw"], fn _raw -> newRaw end)
-      end)
-
-    {:noreply, ctx}
-  end
-
-  def handle_event("refreshPlugins", _, %{assigns: %{fields: fields}} = ctx) do
-    loaded_plugins = Merquery.Plugins.loaded_plugins()
-
-    updated_fields =
-      Map.update(fields, "plugins", [], fn plugins ->
-        (plugins ++ loaded_plugins) |> Enum.uniq_by(&Map.get(&1, "name"))
-      end)
-
-    ctx =
-      update(ctx, :fields, fn _ -> updated_fields end)
-
-    broadcast_event(ctx, "update", %{"fields" => updated_fields})
+    broadcast_event(ctx, "update", %{"fields" => updated_flask})
     {:noreply, ctx}
   end
 
   def handle_event(
-        "importCurlCommand",
-        curlCommand,
-        %{assigns: %{fields: %{"queries" => queries} = fields}} = ctx
+        "updateRaw",
+        %{"raw" => newRaw, "target" => target},
+        ctx,
+        %Flask{queryIndex: queryIndex} = flask
       ) do
-    req =
-      try do
-        curlCommand
-        |> CurlReq.from_curl()
-      rescue
-        MatchError ->
-          nil
-      end
+    updated_flask =
+      update_in(
+        flask,
+        [:queries, Access.at(queryIndex), String.to_existing_atom(target), :raw],
+        fn _raw -> newRaw end
+      )
 
-    unless is_nil(req) do
-      contentType =
-        case Map.get(req.headers, "content-type") do
-          [type] ->
-            type
-
-          types when is_list(types) ->
-            hd(types)
-
-          nil ->
-            "none"
-        end
-
-      form =
-        if contentType == "application/x-www-form-urlencoded" do
-          URI.decode_query(req.body)
-          |> Enum.map(fn {k, v} ->
-            %{"key" => k, "value" => v, "active" => true, "type" => 0}
-          end)
-        else
-          []
-        end
-
-      auth =
-        case Req.Request.get_option(req, :auth) do
-          {:bearer, token} -> %{"type" => 0, "value" => token, "scheme" => "bearer"}
-          {:basic, credentials} -> %{"type" => 0, "value" => credentials, "scheme" => "basic"}
-          _ -> %{"type" => 0, "value" => "", "scheme" => ""}
-        end
-
-      new_query =
-        %{
-          "variable" => Kino.SmartCell.prefixed_var_name("resp", nil),
-          "request_type" => req.method |> Atom.to_string(),
-          "params" =>
-            if(req.url.query,
-              do:
-                URI.decode_query(req.url.query)
-                |> Enum.map(fn {k, v} ->
-                  %{"key" => k, "value" => v, "active" => true, "type" => 0}
-                end),
-              else: []
-            ),
-          "headers" =>
-            req.headers
-            |> Enum.map(fn {k, v} ->
-              %{"key" => k, "value" => v, "active" => true, "type" => 0}
-            end),
-          "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
-          "verbs" => Constants.all_verbs(),
-          "steps" => get_default_steps(),
-          "plugins" => Merquery.Plugins.loaded_plugins(),
-          "body" => %{
-            "contentType" => contentType,
-            "form" => form,
-            "raw" =>
-              if(contentType in ["none", "application/x-www-form-urlencoded"],
-                do: "",
-                else: req.body
-              )
-          },
-          "options" => %{"raw" => "", "contentType" => "elixir"},
-          # type can be in ["string", "basic", "bearer", "netrc"]
-          "auth" => auth
-        }
-
-      updated_fields =
-        fields
-        |> Map.update!("queries", fn _ -> queries ++ [new_query] end)
-        |> Map.update!("queryIndex", fn _ -> length(queries) end)
-
-      ctx =
-        update(ctx, :fields, fn _ ->
-          updated_fields
-        end)
-
-      broadcast_event(ctx, "update", %{"fields" => updated_fields})
-    else
-      broadcast_event(ctx, "curlError", %{})
-    end
+    ctx =
+      update(ctx, :fields, fn _ ->
+        updated_flask
+      end)
 
     {:noreply, ctx}
   end
 
-  def handle_event("copyAsCurlCommand", _, %{assigns: %{fields: fields}} = ctx) do
-    {req, _} = _to_source(fields, true) |> Code.eval_string()
-    curlCommand = CurlReq.to_curl(req)
+  def handle_event("refreshPlugins", _, ctx, %Flask{queryIndex: queryIndex} = flask) do
+    loaded_plugins = Merquery.Plugins.loaded_plugins()
+
+    updated_flask =
+      update_in(flask, [:queries, Access.at!(queryIndex), :plugins], fn plugins ->
+        (plugins ++ Enum.map(loaded_plugins, &Plugin.new/1)) |> Enum.uniq_by(&Map.get(&1, :name))
+      end)
+      |> dump()
+
+    ctx =
+      update(ctx, :fields, fn _ -> updated_flask end)
+
+    broadcast_event(ctx, "update", %{"fields" => updated_flask})
+    {:noreply, ctx}
+  end
+
+  def handle_event(
+        "importFromString",
+        string,
+        ctx,
+        %Flask{queries: queries} = flask
+      ) do
+    ctx =
+      case Jason.decode(string) do
+        {:ok, %{"queries" => importedQueries}} ->
+          updated_flask =
+            %{flask | queries: queries ++ Enum.map(importedQueries, &Query.new/1)}
+            |> dump()
+
+          ctx =
+            update(ctx, :fields, fn _ ->
+              updated_flask
+            end)
+
+          broadcast_event(ctx, "update", %{"fields" => updated_flask})
+          ctx
+
+        _ ->
+          req =
+            try do
+              string
+              |> CurlReq.from_curl()
+            rescue
+              MatchError ->
+                nil
+            end
+
+          unless is_nil(req) do
+            contentType =
+              case Map.get(req.headers, "content-type") do
+                [type] ->
+                  type
+
+                types when is_list(types) ->
+                  hd(types)
+
+                nil ->
+                  "none"
+              end
+
+            form =
+              if contentType == "application/x-www-form-urlencoded" do
+                URI.decode_query(req.body)
+                |> Enum.map(fn {k, v} ->
+                  %{"key" => k, "value" => v, "active" => true, "type" => 0}
+                end)
+              else
+                []
+              end
+
+            auth =
+              case Req.Request.get_option(req, :auth) do
+                {:bearer, token} ->
+                  %{value: token, scheme: :bearer}
+
+                {:basic, credentials} ->
+                  %{value: credentials, scheme: :basic}
+
+                _ ->
+                  %{value: "", scheme: :none}
+              end
+
+            new_query =
+              Query.new(%{
+                "request_type" => req.method |> Atom.to_string(),
+                "params" =>
+                  if(req.url.query,
+                    do:
+                      URI.decode_query(req.url.query)
+                      |> Enum.map(fn {k, v} ->
+                        %{"key" => k, "value" => v, "active" => true, "type" => 0}
+                      end),
+                    else: []
+                  ),
+                "headers" =>
+                  req.headers
+                  |> Enum.map(fn {k, v} ->
+                    %{"key" => k, "value" => v, "active" => true, "type" => 0}
+                  end),
+                "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
+                "body" =>
+                  Body.new(%{
+                    contentType: contentType,
+                    form: form,
+                    raw:
+                      if(contentType in ["none", "application/x-www-form-urlencoded"],
+                        do: "",
+                        else: req.body
+                      )
+                  }),
+                "options" => Options.new(%{raw: "", contentType: "elixir"}),
+                "auth" => Auth.new(auth)
+              })
+
+            updated_flask =
+              %{flask | queries: queries ++ [new_query], queryIndex: length(queries)}
+              |> dump()
+
+            ctx =
+              update(ctx, :fields, fn _ ->
+                updated_flask
+              end)
+
+            broadcast_event(ctx, "update", %{"fields" => updated_flask})
+            ctx
+          else
+            broadcast_event(ctx, "curlError", %{})
+            ctx
+          end
+      end
+
+    {:noreply, ctx}
+  end
+
+  def handle_event("copyAsCurlCommand", _, ctx, %Flask{} = flask) do
+    {req, _} = _to_source(flask, true) |> Code.eval_string()
+    curlCommand = CurlReq.to_curl(req, run_steps: [except: [:auth]])
     broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
+    {:noreply, ctx}
+  end
+
+  def handle_event(
+        "importFromFile",
+        {:binary, %{"filename" => _filename, "mimeType" => "application/json"}, binary},
+        ctx,
+        %Flask{queries: queries} = flask
+      ) do
+    ctx =
+      case Jason.decode(binary) do
+        {:ok, %{"queries" => importedQueries}} ->
+          updated_flask =
+            %{flask | queries: queries ++ Enum.map(importedQueries, &Query.new/1)}
+            |> dump()
+
+          ctx =
+            update(ctx, :fields, fn _ ->
+              updated_flask
+            end)
+
+          broadcast_event(ctx, "update", %{"fields" => updated_flask})
+          ctx
+
+        _ ->
+          broadcast_event(ctx, "curlError", %{})
+          ctx
+      end
+
+    {:noreply, ctx}
+  end
+
+  def handle_event("exportAsJson", _, ctx, %Flask{} = flask) do
+    case Jason.encode(flask) do
+      {:ok, encoded} ->
+        reply_payload = {:binary, nil, encoded}
+        broadcast_event(ctx, "downloadSaveAsJson", reply_payload)
+
+      {:error, _error} ->
+        broadcast_event(ctx, "curlError", %{})
+    end
+
     {:noreply, ctx}
   end
 
   def handle_event(
         "addDep",
         %{"depString" => depString},
-        ctx
+        ctx,
+        _flask
       ) do
     {dep, _} = Code.eval_string(depString)
 
@@ -668,14 +573,14 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
-  defp missing_dep(%{"queries" => queries, "queryIndex" => queryIndex}) do
+  defp missing_dep(%Flask{queries: queries, queryIndex: queryIndex}) do
     query = queries |> Enum.at(queryIndex)
 
     missing_dep(query)
   end
 
-  defp missing_dep(%{"plugins" => plugins}) do
-    for %{"name" => name, "active" => true, "version" => version} <- plugins do
+  defp missing_dep(%Query{plugins: plugins}) do
+    for %Plugin{name: name, active: true, version: version} <- plugins do
       unless Code.ensure_loaded?(String.to_existing_atom(name)) do
         version
       end

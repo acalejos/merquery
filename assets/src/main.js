@@ -62,6 +62,19 @@ export async function init(ctx, info) {
     }
   });
 
+  ctx.handleEvent("downloadSaveAsJson", ([_info, buffer]) => {
+    const blob = new Blob([buffer], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = url;
+    a.download = "download.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
   ctx.handleSync(() => {
     // Synchronously invokes change listeners
     document.activeElement &&

@@ -105,7 +105,7 @@ deploy the generated livebook from `mix merquery.generate`
 * [X] Move Vue to Composition API and breakout components to SPCs *(EDIT: Keeping options API for now, but moved to using SFCs)*
 * [ ] Import from OpenAPI Spec
 * [X] Import/export to/from cURL
-* [ ] Import/export to/from file (select from prompts)
+* [X] Import/export to/from file (select from prompts)
 * [X] Auth section
-* [ ] Tabs for multiple queries
+* [X] Tabs for multiple queries
 * [ ] Query history (could use `scan_eval_result` callback)
