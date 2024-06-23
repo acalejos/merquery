@@ -3,7 +3,7 @@ defmodule Merquery.Schemas.Flask do
 
   use Merquery.Schema,
     schema: [
-      embeds_many(:queries, Query, on_replace: :delete),
+      embeds_many(:queries, Query),
       field(:queryIndex, :integer, default: 0)
     ]
 end

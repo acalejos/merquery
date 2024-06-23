@@ -79,17 +79,11 @@ defmodule Merquery.SmartCell do
 
   defp _to_source(query = %Query{}, return_req) do
     using_defaults = Query.using_default_steps?(query)
-
     pretty_headers = Query.to_quoted(query, :headers)
-
     pretty_params = Query.to_quoted(query, :params)
-
     pretty_plugins = Query.to_quoted(query, :plugins)
-
     pretty_options = Query.to_quoted(query, :options)
-
     pretty_auth = Query.to_quoted(query, :auth)
-
     pretty_body = Query.to_quoted(query, :body)
 
     req_args =
@@ -144,8 +138,6 @@ defmodule Merquery.SmartCell do
         error_steps =
           new_req |> Map.get(:error_steps) |> Enum.filter(fn {k, _v} -> k in error_steps end)
 
-        # We pass the options keys to Req.Request.register_options/1 since they should be validated
-        # beforehand -- we don't need Req to do it and it clutters the generated code
         quote do
           req =
             Req.Request.new(unquote(req_args))

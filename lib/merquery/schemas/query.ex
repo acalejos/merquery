@@ -5,13 +5,13 @@ defmodule Merquery.Schemas.Query do
 
   use Merquery.Schema,
     schema: [
-      embeds_one(:auth, Auth, defaults_to_struct: true, on_replace: :delete),
-      embeds_one(:body, Body, defaults_to_struct: true, on_replace: :delete),
-      embeds_many(:params, MultiInput, on_replace: :delete),
-      embeds_many(:headers, MultiInput, on_replace: :delete),
-      embeds_one(:options, Options, defaults_to_struct: true, on_replace: :delete),
-      embeds_many(:plugins, Plugin, on_replace: :delete),
-      embeds_one(:steps, Steps, defaults_to_struct: true, on_replace: :delete),
+      embeds_one(:auth, Auth),
+      embeds_one(:body, Body),
+      embeds_many(:params, MultiInput),
+      embeds_many(:headers, MultiInput),
+      embeds_one(:options, Options),
+      embeds_many(:plugins, Plugin),
+      embeds_one(:steps, Steps),
       field(:request_type, Ecto.Enum,
         values: [:get, :post, :put, :patch, :delete, :head, :options],
         default: :get

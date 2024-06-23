@@ -1,6 +1,9 @@
 defmodule Merquery.Schema do
   import Ecto.Changeset
 
+  @embeds_one_defaults [defaults_to_struct: true, on_replace: :delete]
+  @embeds_many_defaults [on_replace: :delete]
+
   defmacro __using__(schema: schema) do
     quote do
       @behaviour Access
@@ -9,11 +12,23 @@ defmodule Merquery.Schema do
       defdelegate get_and_update(term, key, fun), to: Map
       defdelegate pop(data, key), to: Map
 
-      import Merquery.Schema
+      import Merquery.Schema, only: [cast_all: 2]
       use Ecto.Schema
 
       @primary_key false
       embedded_schema do
+        import Ecto.Schema,
+          except: [
+            embeds_one: 2,
+            embeds_one: 3,
+            embeds_one: 4,
+            embeds_many: 2,
+            embeds_many: 3,
+            embeds_many: 4
+          ]
+
+        import Merquery.Schema, only: :macros
+
         unquote(schema)
       end
 
@@ -59,5 +74,72 @@ defmodule Merquery.Schema do
 
   def dump(obj) do
     obj |> Ecto.embedded_dump(:json)
+  end
+
+  defmacro embeds_one(name, schema, opts \\ [])
+
+  defmacro embeds_one(name, schema, do: block) do
+    quote do
+      Ecto.Schema.embeds_one(unquote(name), unquote(schema), unquote(@embeds_one_defaults),
+        do: unquote(block)
+      )
+    end
+  end
+
+  defmacro embeds_one(name, schema, opts) do
+    quote do
+      Ecto.Schema.embeds_one(
+        unquote(name),
+        unquote(schema),
+        unquote(opts) ++ unquote(@embeds_one_defaults)
+      )
+    end
+  end
+
+  defmacro embeds_one(name, schema, opts, do: block) do
+    quote do
+      Ecto.Schema.embeds_one(
+        unquote(name),
+        unquote(schema),
+        unquote(opts) ++ unquote(@embeds_one_defaults),
+        do: unquote(block)
+      )
+    end
+  end
+
+  defmacro embeds_many(name, schema, opts \\ [])
+
+  defmacro embeds_many(name, schema, do: block) do
+    quote do
+      embeds_many(unquote(name), unquote(schema), unquote(@embeds_many_defaults),
+        do: unquote(block)
+      )
+    end
+  end
+
+  defmacro embeds_many(name, schema, opts) do
+    quote do
+      Ecto.Schema.embeds_many(
+        unquote(name),
+        unquote(schema),
+        unquote(opts) ++ unquote(@embeds_many_defaults)
+      )
+    end
+  end
+
+  @doc """
+  Indicates an embedding of many schemas.
+
+  For options and examples see documentation of `embeds_many/3`.
+  """
+  defmacro embeds_many(name, schema, opts, do: block) do
+    quote do
+      Ecto.Schema.embeds_many(
+        unquote(name),
+        unquote(schema),
+        unquote(opts) ++ unquote(@embeds_many_defaults),
+        do: unquote(block)
+      )
+    end
   end
 end
