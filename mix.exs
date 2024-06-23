@@ -31,8 +31,8 @@ defmodule Merquery.MixProject do
       {:req, "~> 0.4"},
       {:ex_doc, ">= 0.0.0", runtime: false},
       {:jason, "~> 1.4"},
-      # {:curl_req, github: "derekkraan/curl_req"},
-      {:curl_req, path: "/Users/andres/Documents/curl_req"},
+      {:curl_req, github: "acalejos/curl_req"},
+      #{:curl_req, path: "/Users/andres/Documents/curl_req"},
       {:ecto, github: "elixir-ecto/ecto", ref: "master"}
     ]
   end
