@@ -3,7 +3,7 @@ defmodule Merquery.Schemas.Query do
   alias Merquery.Helpers.{Constants, State}
   alias Merquery.Helpers
 
-  use Merquery.Schema,
+  use Flint,
     schema: [
       embeds_one(:auth, Auth),
       embeds_one(:body, Body),
@@ -33,7 +33,7 @@ defmodule Merquery.Schemas.Query do
       |> Map.put_new_lazy("verbs", fn -> Constants.all_verbs() end)
 
     %__MODULE__{}
-    |> cast_all(params)
+    |> changeset(params)
     |> Ecto.Changeset.apply_changes()
   end
 

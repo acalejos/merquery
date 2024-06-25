@@ -1,7 +1,7 @@
 defmodule Merquery.Schemas.Options do
   alias Merquery.Schemas.ContentType
 
-  use Merquery.Schema,
+  use Flint,
     schema: [
       field(:contentType, ContentType, default: :elixir),
       field(:raw, :string, default: "")

@@ -1,7 +1,7 @@
 defmodule Merquery.Schemas.Steps do
   alias Merquery.Schemas.Step
 
-  use Merquery.Schema,
+  use Flint,
     schema: [
       embeds_many(:request_steps, Step),
       embeds_many(:response_steps, Step),

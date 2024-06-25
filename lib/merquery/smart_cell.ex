@@ -3,7 +3,7 @@ defmodule Merquery.SmartCell do
   use Kino.JS.Live
   use Kino.SmartCell, name: "Merquery"
   alias Merquery.Helpers.State
-  import Merquery.Schema, only: [dump: 1]
+  import Flint.Schema, only: [dump: 1]
 
   alias Merquery.Schemas.{
     Steps,

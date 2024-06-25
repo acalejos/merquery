@@ -1,5 +1,5 @@
 defmodule Merquery.Schemas.MultiInput do
-  use Merquery.Schema,
+  use Flint,
     schema: [
       field(:active, :boolean, default: true),
       field(:key, :string, default: ""),

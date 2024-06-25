@@ -1,5 +1,5 @@
 defmodule Merquery.Schemas.Plugin do
-  use Merquery.Schema,
+  use Flint,
     schema: [
       field(:active, :boolean, default: true),
       field(:description, :string),
