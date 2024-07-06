@@ -33,7 +33,7 @@ defmodule Merquery.MixProject do
       {:jason, "~> 1.4"},
       {:curl_req, github: "acalejos/curl_req"},
       # {:curl_req, path: "/Users/andres/Documents/curl_req"},
-      {:flint, github: "acalejos/flint"}
+      {:flint, github: "acalejos/flint", ref: "15fac99"}
     ]
   end
 

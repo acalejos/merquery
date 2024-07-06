@@ -24,7 +24,7 @@ defmodule Merquery.Schemas.Query do
       )
     ]
 
-  def new(params \\ %{}) do
+  def new(params \\ %{}, bindings \\ []) do
     params =
       params
       |> Map.put_new_lazy("steps", fn -> Steps.default_steps() |> Ecto.embedded_dump(:json) end)
@@ -33,7 +33,7 @@ defmodule Merquery.Schemas.Query do
       |> Map.put_new_lazy("verbs", fn -> Constants.all_verbs() end)
 
     %__MODULE__{}
-    |> changeset(params)
+    |> changeset(params, bindings)
     |> Ecto.Changeset.apply_changes()
   end
 
