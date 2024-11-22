@@ -1,15 +1,13 @@
 defmodule Merquery.Schemas.MultiInput do
-  use Flint,
-    schema: [
-      field(:active, :boolean, default: true),
-      field(:key, :string, default: ""),
-      field(:value, :string, default: ""),
-      field(:type, Ecto.Enum,
-        values: [plaintext: 0, secret: 1, variable: 2],
-        embed_as: :dumped,
-        default: :plaintext
-      )
-    ]
+  use Flint.Schema
+
+  embedded_schema do
+    field :active, :boolean, default: true
+    field :key, :string, default: ""
+    field :value, :string, default: ""
+
+    field :type, Merquery.Types.MultiInput, embed_as: :dumped, default: :plaintext
+  end
 
   def to_quoted(%__MODULE__{key: key, value: value, type: :secret}),
     do: {key, quote(do: System.fetch_env!(unquote("LB_#{value}")))}

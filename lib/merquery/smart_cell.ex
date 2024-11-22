@@ -2,6 +2,7 @@ defmodule Merquery.SmartCell do
   use Kino.JS, assets_path: "assets/build"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Merquery"
+  require Merquery.Helpers.Constants
   alias Merquery.Helpers.State
   import Flint.Schema, only: [dump: 1]
 
@@ -138,10 +139,19 @@ defmodule Merquery.SmartCell do
         error_steps =
           new_req |> Map.get(:error_steps) |> Enum.filter(fn {k, _v} -> k in error_steps end)
 
+        {top_args, option_args} =
+          Keyword.split(req_args, [:method, :url, :headers, :body, :adapter])
+
+        options_to_register =
+          Keyword.keys(pretty_options ++ option_args)
+          |> Enum.filter(&Merquery.Helpers.Constants.is_req_opt/1)
+
         quote do
+          # Use low-level API and build up request
           req =
-            Req.Request.new(unquote(req_args))
-            |> Req.merge(unquote(pretty_options))
+            Req.Request.new(unquote(top_args))
+            |> Req.Request.register_options(unquote(options_to_register))
+            |> Req.merge(unquote(option_args))
             |> Req.Request.append_request_steps(unquote(request_steps))
             |> Req.Request.append_response_steps(unquote(response_steps))
             |> Req.Request.append_error_steps(unquote(error_steps))
@@ -149,14 +159,20 @@ defmodule Merquery.SmartCell do
       end
 
     plugin_block =
-      quote do
-        req =
-          Enum.reduce(unquote(pretty_plugins), req, fn plugin, acc -> plugin.attach(acc) end)
+      if pretty_plugins != [] do
+        quote do
+          # Plugins are attached here
+          req =
+            Enum.reduce(unquote(pretty_plugins), req, fn plugin, acc -> plugin.attach(acc) end)
+        end
       end
 
     options_block =
-      quote do
-        req = Req.merge(req, unquote(pretty_options))
+      if pretty_options != [] do
+        quote do
+          # Options from the 'Options' tab merged here
+          req = Req.merge(req, unquote(pretty_options))
+        end
       end
 
     run_block =
@@ -176,6 +192,7 @@ defmodule Merquery.SmartCell do
         true ->
           [steps_block, plugin_block, options_block, run_block]
       end
+      |> Enum.filter(& &1)
 
     blocks
     |> Enum.map(&Kino.SmartCell.quoted_to_string/1)
@@ -388,7 +405,13 @@ defmodule Merquery.SmartCell do
                 nil
             end
 
-          unless is_nil(req) do
+          if is_nil(req) do
+            broadcast_event(ctx, "curlError", %{
+              message: "Trouble importing from! Invalid import content."
+            })
+
+            ctx
+          else
             contentType =
               case Map.get(req.headers, "content-type") do
                 [type] ->
@@ -466,9 +489,6 @@ defmodule Merquery.SmartCell do
 
             broadcast_event(ctx, "update", %{"fields" => updated_flask})
             ctx
-          else
-            broadcast_event(ctx, "curlError", %{})
-            ctx
           end
       end
 
@@ -477,8 +497,15 @@ defmodule Merquery.SmartCell do
 
   def handle_event("copyAsCurlCommand", _, ctx, %Flask{} = flask) do
     {req, _} = _to_source(flask, true) |> Code.eval_string()
-    curlCommand = CurlReq.to_curl(req, run_steps: [except: [:auth]])
-    broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
+
+    try do
+      curlCommand = CurlReq.to_curl(req)
+      broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
+    rescue
+      e in RuntimeError ->
+        broadcast_event(ctx, "curlError", %{message: e.message})
+    end
+
     {:noreply, ctx}
   end
 
@@ -504,7 +531,10 @@ defmodule Merquery.SmartCell do
           ctx
 
         _ ->
-          broadcast_event(ctx, "curlError", %{})
+          broadcast_event(ctx, "curlError", %{
+            message: "Trouble importing from! Invalid import content."
+          })
+
           ctx
       end
 
@@ -517,8 +547,8 @@ defmodule Merquery.SmartCell do
         reply_payload = {:binary, nil, encoded}
         broadcast_event(ctx, "downloadSaveAsJson", reply_payload)
 
-      {:error, _error} ->
-        broadcast_event(ctx, "curlError", %{})
+      {:error, error} ->
+        broadcast_event(ctx, "curlError", %{message: error})
     end
 
     {:noreply, ctx}
@@ -573,7 +603,7 @@ defmodule Merquery.SmartCell do
 
   defp missing_dep(%Query{plugins: plugins}) do
     for %Plugin{name: name, active: true, version: version} <- plugins do
-      unless Code.ensure_loaded?(String.to_existing_atom(name)) do
+      unless Code.ensure_loaded?(String.to_atom(name)) do
         version
       end
     end

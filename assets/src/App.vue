@@ -179,16 +179,16 @@ export default {
             <pre><code>{{ missingDep }}</code></pre>
         </div>
         <div class="box box-warning" v-if="curlError">
-            <p>Trouble importing from! Invalid import content.</p>
+            <p>{{ curlError }}</p>
         </div>
         <div v-if="modelValue.fields.queries.length > 0" ref="tabsContainer"
             class="flex items-center border-gray-200 overflow-hidden">
             <div ref="scrollContainer" class="flex overflow-x-auto scrollbar-hide">
                 <div class="flex">
-                    <div v-for="(tab, index) in  modelValue.fields.queries " :key="index" :class="[
-            'flex items-center relative min-w-24 max-w-36 cursor-pointer px-2 py-3 border-l truncate border-gray-300 group',
-            modelValue.fields.queryIndex === index ? 'bg-blue-100 text-black font-bold border-t-2 border-t-blue-500' : 'bg-white border-t text-gray-500 mt-0.5'
-        ]" @click.stop="selectTab(index)">
+                    <div v-for="(tab, index) in modelValue.fields.queries " :key="index" :class="[
+                        'flex items-center relative min-w-24 max-w-36 cursor-pointer px-2 py-3 border-l truncate border-gray-300 group',
+                        modelValue.fields.queryIndex === index ? 'bg-blue-100 text-black font-bold border-t-2 border-t-blue-500' : 'bg-white border-t text-gray-500 mt-0.5'
+                    ]" @click.stop="selectTab(index)">
                         <span :class="['text-xs mr-2', this.methodDetails[queryAt(index).request_type].color]">
                             {{ this.methodDetails[queryAt(index).request_type].label }}
                         </span>
@@ -197,10 +197,10 @@ export default {
                         </span>
                         <!-- Delete Button -->
                         <button @click.stop="deleteTab(index)" :class="[
-            'absolute right-2 top-1/2 transform -translate-y-1/2 hidden group-hover:block p-1 rounded-md',
-            modelValue.fields.queryIndex === index ? 'bg-blue-100 hover:bg-blue-50 text-black font-bold' : 'bg-white hover:bg-gray-50 text-gray-500',
-            'focus:outline-none', 'active:bg-gray-200', 'active:shadow-inner'
-        ]" style="width: 24px; height: 24px; transition: background-color 0.2s, box-shadow 0.2s;">
+                            'absolute right-2 top-1/2 transform -translate-y-1/2 hidden group-hover:block p-1 rounded-md',
+                            modelValue.fields.queryIndex === index ? 'bg-blue-100 hover:bg-blue-50 text-black font-bold' : 'bg-white hover:bg-gray-50 text-gray-500',
+                            'focus:outline-none', 'active:bg-gray-200', 'active:shadow-inner'
+                        ]" style="width: 24px; height: 24px; transition: background-color 0.2s, box-shadow 0.2s;">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor" stroke-width="2" class="w-4 h-4">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -212,9 +212,9 @@ export default {
             </div>
             <!-- Add Button -->
             <button @click="addTab" :class="[
-            'mt-0.5 flex-none py-2 border-l px-4 rounded-tr hover:bg-gray-300 flex items-center justify-center',
-            'bg-white text-gray-600 border-gray-200 w-12'  // Set a fixed width of 4rem and initial background to white
-        ]" :style="{ 'position': shouldStick ? 'absolute' : 'static', 'right': '0' }">
+                'mt-0.5 flex-none py-2 border-l px-4 rounded-tr hover:bg-gray-300 flex items-center justify-center',
+                'bg-white text-gray-600 border-gray-200 w-12'  // Set a fixed width of 4rem and initial background to white
+            ]" :style="{ 'position': shouldStick ? 'absolute' : 'static', 'right': '0' }">
                 <!-- Plus Icon -->
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
                     <path fill-rule="evenodd"
@@ -322,7 +322,7 @@ export default {
                             <label for="tabs" class="sr-only">Select a tab</label>
                             <select id="tabs" name="tabs"
                                 class="block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                                <option v-for="      tab       in       tabs      " :key="tab"
+                                <option v-for="      tab in tabs      " :key="tab"
                                     :selected="currentTab === tab">
                                     {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
                                 </option>
@@ -333,7 +333,7 @@ export default {
                             <div class="border-b border-gray-200">
                                 <nav class="-mb-px flex" aria-label="Tabs">
                                     <button type="button" @click="currentTab = tab"
-                                        v-for="      tab       in       tabs      " :key="tab"
+                                        v-for="      tab in tabs      " :key="tab"
                                         :class="[currentTab === tab ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700', 'w-1/4 border-b-2 py-4 px-1 text-center text-sm font-medium']"
                                         :aria-current="currentTab === tab ? 'page' : undefined">
                                         {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}

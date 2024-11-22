@@ -1,12 +1,13 @@
 defmodule Merquery.Schemas.Steps do
   alias Merquery.Schemas.Step
 
-  use Flint,
-    schema: [
-      embeds_many(:request_steps, Step),
-      embeds_many(:response_steps, Step),
-      embeds_many(:error_steps, Step)
-    ]
+  use Flint.Schema
+
+  embedded_schema do
+    embeds_many :request_steps, Step
+    embeds_many :response_steps, Step
+    embeds_many :error_steps, Step
+  end
 
   def default_steps() do
     {:docs_v1, _annotation, _beam_language, _format, _module_doc, _metadata, docs} =
@@ -39,6 +40,6 @@ defmodule Merquery.Schemas.Steps do
         Map.put(acc, stage, steps)
       end)
 
-    new(all_steps)
+    __MODULE__.new(all_steps)
   end
 end

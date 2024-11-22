@@ -31,9 +31,8 @@ defmodule Merquery.MixProject do
       {:req, "~> 0.4"},
       {:ex_doc, ">= 0.0.0", runtime: false},
       {:jason, "~> 1.4"},
-      {:curl_req, github: "acalejos/curl_req"},
-      # {:curl_req, path: "/Users/andres/Documents/curl_req"},
-      {:flint, github: "acalejos/flint", ref: "15fac99de26bd789c2b19a8126f244677b5533a9"}
+      {:curl_req, "~> 0.98.5"},
+      {:flint, "~> 0.6"}
     ]
   end
 

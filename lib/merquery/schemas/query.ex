@@ -3,26 +3,30 @@ defmodule Merquery.Schemas.Query do
   alias Merquery.Helpers.{Constants, State}
   alias Merquery.Helpers
 
-  use Flint,
-    schema: [
-      embeds_one(:auth, Auth),
-      embeds_one(:body, Body),
-      embeds_many(:params, MultiInput),
-      embeds_many(:headers, MultiInput),
-      embeds_one(:options, Options),
-      embeds_many(:plugins, Plugin),
-      embeds_one(:steps, Steps),
-      field(:request_type, Ecto.Enum,
-        values: [:get, :post, :put, :patch, :delete, :head, :options],
-        default: :get
-      ),
-      field(:url, :string, default: ""),
-      field(:variable, :string, default: ""),
-      field(:verbs, {:array, Ecto.Enum},
-        values: [:get, :post, :put, :patch, :delete, :head, :options],
-        default: [:get, :post, :put, :patch, :delete, :head, :options]
-      )
-    ]
+  use Flint.Schema
+
+  @request_types [:get, :post, :put, :patch, :delete, :head, :options]
+
+  embedded_schema do
+    embeds_one :auth, Auth
+    embeds_one :body, Body
+    embeds_many :params, MultiInput
+    embeds_many :headers, MultiInput
+    embeds_one :options, Options
+    embeds_many :plugins, Plugin
+    embeds_one :steps, Steps
+
+    field :request_type, Ecto.Enum,
+      values: @request_types,
+      default: :get
+
+    field :url, :string, default: ""
+    field :variable, :string, default: ""
+
+    field :verbs, {:array, Ecto.Enum},
+      values: @request_types,
+      default: @request_types
+  end
 
   def new(params \\ %{}, bindings \\ []) do
     params =
@@ -82,6 +86,7 @@ defmodule Merquery.Schemas.Query do
   def to_quoted(%__MODULE__{auth: %{scheme: :none}}, :auth), do: []
 
   def to_quoted(%__MODULE__{} = query, :auth) do
+    IO.inspect(query)
     %{value: value, scheme: scheme, type: type} = query.auth
 
     evald_value =

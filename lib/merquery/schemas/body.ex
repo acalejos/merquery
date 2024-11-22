@@ -1,11 +1,9 @@
 defmodule Merquery.Schemas.Body do
-  alias Merquery.Schemas.ContentType
-  alias Merquery.Schemas.MultiInput
+  use Flint.Schema
 
-  use Flint,
-    schema: [
-      field(:contentType, ContentType, default: :none),
-      embeds_many(:form, MultiInput),
-      field(:raw, :string, default: "")
-    ]
+  embedded_schema do
+    field :contentType, Merquery.Schemas.ContentType, default: :none
+    embeds_many :form, Merquery.Schemas.MultiInput
+    field :raw, :string, default: ""
+  end
 end

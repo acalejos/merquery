@@ -35,11 +35,11 @@ export async function init(ctx, info) {
     app.missingDep = dep;
   });
 
-  ctx.handleEvent("curlError", ({}) => {
-    state.curlError = true;
+  ctx.handleEvent("curlError", ({ message: message }) => {
+    state.curlError = message;
     setTimeout(() => {
       state.curlError = false;
-    }, 3000);
+    }, 5000);
   });
 
   ctx.handleEvent("set_available_bindings", ({ available_bindings }) => {
