@@ -86,7 +86,6 @@ defmodule Merquery.Schemas.Query do
   def to_quoted(%__MODULE__{auth: %{scheme: :none}}, :auth), do: []
 
   def to_quoted(%__MODULE__{} = query, :auth) do
-    IO.inspect(query)
     %{value: value, scheme: scheme, type: type} = query.auth
 
     evald_value =

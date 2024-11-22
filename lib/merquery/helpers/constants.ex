@@ -67,4 +67,5 @@ defmodule Merquery.Helpers.Constants do
   defguard is_merquery_opt(v) when v in @merquery_opts
   def all_verb_strings(), do: Enum.map(@allowed_verbs, &Atom.to_string/1)
   def all_verbs(), do: @allowed_verbs
+  defguard is_verb(verb) when verb in @allowed_verbs
 end

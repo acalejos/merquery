@@ -28,7 +28,7 @@ defmodule Merquery.SmartCell do
 
     ctx =
       assign(ctx,
-        fields: flask |> dump(),
+        fields: dump(flask),
         missing_dep: missing_dep(flask),
         available_plugins:
           Merquery.Plugins.available_plugins()
@@ -39,12 +39,12 @@ defmodule Merquery.SmartCell do
   end
 
   def init(attrs = %{}, ctx) do
-    new_query = Query.new(attrs) |> dump()
+    new_query = attrs |> Query.new() |> dump()
     flask = Flask.new(%{queries: [new_query], queryIndex: 0})
 
     ctx =
       assign(ctx,
-        fields: flask |> dump(),
+        fields: dump(flask),
         missing_dep: missing_dep(flask),
         available_plugins:
           Merquery.Plugins.available_plugins()
@@ -254,7 +254,7 @@ defmodule Merquery.SmartCell do
         List.update_at(queries, index, fn _ -> Query.new(payload) end)
       end)
 
-    ctx = assign(ctx, fields: flask |> dump())
+    ctx = assign(ctx, fields: dump(flask))
 
     missing_dep = missing_dep(Query.new(payload))
 
@@ -496,14 +496,16 @@ defmodule Merquery.SmartCell do
   end
 
   def handle_event("copyAsCurlCommand", _, ctx, %Flask{} = flask) do
-    {req, _} = _to_source(flask, true) |> Code.eval_string()
-
     try do
+      {req, _} = _to_source(flask, true) |> Code.eval_string()
       curlCommand = CurlReq.to_curl(req)
       broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
     rescue
-      e in RuntimeError ->
+      e in [RuntimeError, ArgumentError] ->
         broadcast_event(ctx, "curlError", %{message: e.message})
+
+      _ ->
+        broadcast_event(ctx, "curlError", %{message: "Unkown error ocurred"})
     end
 
     {:noreply, ctx}

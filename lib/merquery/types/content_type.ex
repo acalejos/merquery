@@ -2,6 +2,8 @@ defmodule Merquery.Schemas.ContentType do
   use Ecto.Type
   def type, do: :atom
 
+  @type_atoms [:json, :none, :plaintext, :javascript, :xml, :form, :elixir, :html]
+
   def cast("application/json"), do: {:ok, :json}
   def cast("none"), do: {:ok, :none}
   def cast("text/plain"), do: {:ok, :plaintext}
@@ -10,6 +12,7 @@ defmodule Merquery.Schemas.ContentType do
   def cast("application/x-www-form-urlencoded"), do: {:ok, :form}
   def cast("elixir"), do: {:ok, :elixir}
   def cast("text/html"), do: {:ok, :html}
+  def cast(type) when type in @type_atoms, do: {:ok, type}
 
   def cast(_), do: :error
 
