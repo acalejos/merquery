@@ -1,14 +1,14 @@
 defmodule Mix.Tasks.Merquery.Generate do
   @moduledoc """
-  Introspects on your project looking at all routes and creates a new Livebook
-  with Merquery Smart Cells pre-populated to interactively test your routes.
+  Introspects on your project looking at all routes and generates a
+  Merquery JSON file that you can load into a Merquery Smart Cell.
 
   Currently only supports Phoenix Routers.
 
   ## Options
 
   * `--router` - The module of your router. Defaults to the default Phoenix Router.
-  * `--out` - Path to save the generated file. Defaults to `merquery.livemd`
+  * `--out` - Path to save the generated file. Defaults to `merquery.json`
   * `--base-url` - Base URL to append to all generated routes. Defaults to `https://0.0.0.0`
   """
   @shortdoc "Generates a Livebook to test your defined routes"
@@ -16,11 +16,10 @@ defmodule Mix.Tasks.Merquery.Generate do
   @requirements ["app.start"]
 
   if Code.ensure_loaded?(Phoenix.Router) do
-    import Merquery.Helpers.Constants
-    alias Merquery.Schemas.{Query, Flask}
-
     @impl Mix.Task
     def run(args) do
+      import Merquery.Helpers.Constants
+
       case Mix.Task.get("phx.routes") do
         Mix.Tasks.Phx.Routes ->
           Mix.Task.run("compile", args)
@@ -86,7 +85,7 @@ defmodule Mix.Tasks.Merquery.Generate do
                 |> then(&if(Keyword.keyword?(&1), do: Enum.into(&1, %{}), else: &1))
 
               {top_level, options} =
-                Map.split(usr_attrs, Map.keys(%Query{} |> Map.delete(:options)))
+                Map.split(usr_attrs, Map.keys(%Merquery.Schemas.Query{} |> Map.delete(:options)))
 
               attrs =
                 Enum.reduce(
@@ -120,11 +119,11 @@ defmodule Mix.Tasks.Merquery.Generate do
                   end
                 )
 
-              Map.merge(auto_attrs, attrs) |> Query.new()
+              Map.merge(auto_attrs, attrs) |> Merquery.Schemas.Query.new()
             end
 
           %{queries: queries}
-          |> Flask.new!()
+          |> Merquery.Schemas.Flask.new!()
           |> Jason.encode!()
           |> then(&File.write!(opts[:out], &1))
 
