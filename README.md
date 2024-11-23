@@ -71,7 +71,7 @@ options in the form of a keyword list. It also supports using previously bound v
 ```elixir
 def deps do
   [
-    {:merquery, github: "acalejos/merquery"}
+    {:merquery, "~> 0.2"}
   ]
 end
 ```
