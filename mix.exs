@@ -4,7 +4,7 @@ defmodule Merquery.MixProject do
   def project do
     [
       app: :merquery,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -40,7 +40,15 @@ defmodule Merquery.MixProject do
     [
       maintainers: ["Andres Alejos"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/acalejos/merquery"}
+      links: %{"GitHub" => "https://github.com/acalejos/merquery"},
+      files: [
+        "lib",
+        "mix.exs",
+        "assets/build",
+        "README*",
+        "LICENSE*",
+        ".formatter.exs"
+      ]
     ]
   end
 end
