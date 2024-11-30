@@ -460,9 +460,10 @@ defmodule Merquery.SmartCell do
                   ),
                 "headers" =>
                   req.headers
-                  |> Enum.map(fn {k, v} ->
+                  |> Enum.map(fn {k, [v | _]} ->
                     %{"key" => k, "value" => v, "active" => true, "type" => 0}
                   end),
+
                 "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
                 "body" =>
                   Body.new(%{

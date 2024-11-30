@@ -49,6 +49,20 @@ export default {
                     },
                     label: "XML"
                 },
+                "application/vnd.api+json": {
+                    options: {
+                        parser: "json",
+                        plugins: [parserBabel, prettierPluginEstree]
+                    },
+                    label: "json_api"
+                },
+                "application/graphql-response+json": {
+                    options: {
+                        parser: "json",
+                        plugins: [parserBabel, prettierPluginEstree]
+                    },
+                    label: "graphql"
+                },
                 "elixir": {
                     options: {},
                     label: "Elixir"
@@ -102,7 +116,7 @@ export default {
                         v-if="modelValue.contentType == 'text/plain' || modelValue.contentType == 'none' || modelValue.contentType == 'application/x-www-form-urlencoded'"
                         class="ml-1 block text-sm font-medium leading-6 text-gray-900" for="raw">Raw</label>
                     <div class="flex items-center"
-                        v-for="contentType in ['application/javascript', 'application/json', 'text/html', 'elixir', 'application/xml']">
+                        v-for="contentType in ['application/javascript', 'application/json', 'application/vnd.api+json', 'application/graphql-response+json', 'text/html', 'elixir', 'application/xml']">
                         <input v-if="modelValue.contentType == contentType"
                             class="ml-2 h-4 w-4 border-gray-300 text-indigo-600" type="radio" id="raw"
                             :value="contentType" v-model="modelValue.contentType">
@@ -115,7 +129,7 @@ export default {
                     v-model="modelValue.contentType" id="language" @change="handleRadioButtons"
                     class="mt-1 block pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                     <option
-                        v-for="contentType in ['text/plain', 'application/javascript', 'application/json', 'text/html', 'elixir', 'application/xml']"
+                        v-for="contentType in ['text/plain', 'application/javascript', 'application/json', 'application/vnd.api+json', 'application/graphql-response+json', 'text/html', 'elixir', 'application/xml']"
                         :value="contentType">{{ this.contentTypes[contentType].label }}</option>
                 </select>
                 <div class="flex-grow"></div>

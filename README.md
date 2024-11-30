@@ -35,6 +35,8 @@ as a learning tool to learn how to use Elixir HTTP clients.
   * `application/x-www-urlencoded` with toggleable fields and support for secrets and custom variables (transforms to an Elixir map and uses the `:form` Req option)
   * Raw field to support many content types with syntax highlighting and taking advantage of Req's [`encode_body`](https://hexdocs.pm/req/Req.Steps.html#encode_body/1) step:
     * `application/json` allows you to write JSON and have it converted to an Elixir map and use the `:json` Req option.
+    * `application/vnd.api+json`
+    * `application/graphql-response+json`
     * `application/javascript`
     * `application/xml`
     * `text/html`

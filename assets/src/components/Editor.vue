@@ -14,6 +14,8 @@ const getLanguageExtension = (language) => {
         case 'application/javascript':
             return javascript();
         case 'application/json':
+        case "application/vnd.api+json":
+        case "application/graphql-response+json":
             return json();
         case 'text/html':
             return html();
@@ -35,6 +37,8 @@ const lang = computed(() => getLanguageExtension(props.modelValue.contentType));
 const onChange = (_state) => {
     switch (props.modelValue.contentType) {
         case "application/json":
+        case "application/vnd.api+json":
+        case "application/graphql-response+json":
             try {
                 const parsedObject = JSON5.parse(props.modelValue.raw);
                 const jsonStringified = JSON.stringify(parsedObject, null, 2);
