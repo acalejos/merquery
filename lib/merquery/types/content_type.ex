@@ -2,7 +2,18 @@ defmodule Merquery.Schemas.ContentType do
   use Ecto.Type
   def type, do: :atom
 
-  @type_atoms [:json, :none, :plaintext, :javascript, :xml, :form, :elixir, :html, :json_api, :graphql]
+  @type_atoms [
+    :json,
+    :none,
+    :plaintext,
+    :javascript,
+    :xml,
+    :form,
+    :elixir,
+    :html,
+    :json_api,
+    :graphql
+  ]
 
   def cast("application/json"), do: {:ok, :json}
   def cast("none"), do: {:ok, :none}

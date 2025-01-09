@@ -136,7 +136,8 @@ defmodule Merquery.Schemas.Query do
     end
   end
 
-  def to_quoted(%__MODULE__{body: %{contentType: contentType, raw: raw}}, :body) when contentType in [:json, :json_api, :graphql] do
+  def to_quoted(%__MODULE__{body: %{contentType: contentType, raw: raw}}, :body)
+      when contentType in [:json, :json_api, :graphql] do
     case Jason.decode(raw) do
       {:ok, json} ->
         [json: json]

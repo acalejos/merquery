@@ -13,7 +13,8 @@ defmodule Merquery.SmartCell do
     Plugin,
     Auth,
     Options,
-    Body
+    Body,
+    MultiInput
   }
 
   @impl true
@@ -463,7 +464,6 @@ defmodule Merquery.SmartCell do
                   |> Enum.map(fn {k, [v | _]} ->
                     %{"key" => k, "value" => v, "active" => true, "type" => 0}
                   end),
-
                 "url" => "#{req.url.scheme}://#{req.url.host}#{req.url.path}",
                 "body" =>
                   Body.new(%{
@@ -496,10 +496,60 @@ defmodule Merquery.SmartCell do
     {:noreply, ctx}
   end
 
+  def handle_event("updateContentTypeHeader", new_type, ctx, %Flask{} = flask) do
+    updated_flask =
+      update_in(
+        flask,
+        [:queries, Access.at!(ctx.assigns.fields.queryIndex), :headers],
+        fn headers ->
+          existing_index =
+            Enum.find_index(headers, fn %{key: k} -> String.downcase(k) == "content-type" end)
+
+          if existing_index do
+            if new_type in ["none", "elixir"] do
+              List.delete_at(headers, existing_index)
+            else
+              List.update_at(headers, existing_index, fn input ->
+                %{input | value: new_type, type: :plaintext}
+              end)
+            end
+          else
+            if new_type == "none" do
+              headers
+            else
+              [MultiInput.new(%{key: "Content-Type", value: new_type}) | headers]
+            end
+          end
+        end
+      )
+      |> update_in(
+        [:queries, Access.at!(ctx.assigns.fields.queryIndex), :body, :contentType],
+        fn _ ->
+          case Merquery.Schemas.ContentType.cast(new_type) do
+            {:ok, type} ->
+              type
+
+            _ ->
+              :none
+          end
+        end
+      )
+      |> dump()
+
+    ctx =
+      update(ctx, :fields, fn _ ->
+        updated_flask
+      end)
+
+    broadcast_event(ctx, "update", %{"fields" => updated_flask})
+
+    {:noreply, ctx}
+  end
+
   def handle_event("copyAsCurlCommand", _, ctx, %Flask{} = flask) do
     try do
       {req, _} = _to_source(flask, true) |> Code.eval_string()
-      curlCommand = CurlReq.to_curl(req)
+      curlCommand = CurlReq.to_curl(req, run_steps: [except: [:auth]])
       broadcast_event(ctx, "copyAsCurlCommand", curlCommand)
     rescue
       e in [RuntimeError, ArgumentError] ->

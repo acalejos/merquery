@@ -54,14 +54,14 @@ export default {
                         parser: "json",
                         plugins: [parserBabel, prettierPluginEstree]
                     },
-                    label: "json_api"
+                    label: "JSON API"
                 },
                 "application/graphql-response+json": {
                     options: {
                         parser: "json",
                         plugins: [parserBabel, prettierPluginEstree]
                     },
-                    label: "graphql"
+                    label: "GraphQL"
                 },
                 "elixir": {
                     options: {},
@@ -81,6 +81,13 @@ export default {
                 }
             }
         };
+    },
+    watch: {
+        'modelValue.contentType': {
+            handler(newValue, _) {
+                this.ctx.pushEvent("updateContentTypeHeader", newValue)
+            },
+        }
     },
     methods: {
         async formatContent() {
@@ -106,7 +113,7 @@ export default {
                         <input class="h-4 w-4 border-gray-300 text-indigo-600" type="radio" id="none"
                             :value="contentType" v-model="modelValue.contentType">
                         <label class="mx-2 block text-sm font-medium leading-6 text-gray-900" for="none">{{
-                        this.contentTypes[contentType].label }}</label>
+                            this.contentTypes[contentType].label }}</label>
                     </div>
                     <input
                         v-if="modelValue.contentType == 'text/plain' || modelValue.contentType == 'none' || modelValue.contentType == 'application/x-www-form-urlencoded'"
